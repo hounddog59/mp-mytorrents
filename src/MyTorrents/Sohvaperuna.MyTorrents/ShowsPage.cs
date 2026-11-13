@@ -273,6 +273,7 @@ namespace Sohvaperuna.MyTorrents
 				lv.Columns.Add("What", 230);
 				lv.Columns.Add("Looking for", 80);
 				lv.Columns.Add("Why", 290);
+				ListSorter cantSorter = new ListSorter(lv, "CantFind"); // 1.3.60
 				Button look = new Button { Text = "Look now", Location = new Point(10, 362), Width = 90, Enabled = false, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
 				Button stop = new Button { Text = "Stop looking", Location = new Point(106, 362), Width = 100, Enabled = false, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
 				Button close = new Button { Text = "Close", DialogResult = DialogResult.Cancel, Location = new Point(550, 362), Width = 80, Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
@@ -290,6 +291,7 @@ namespace Sohvaperuna.MyTorrents
 						lv.Items.Add(i);
 					}
 					lv.EndUpdate();
+					cantSorter.Apply();
 				};
 				lv.SelectedIndexChanged += (s, e) => look.Enabled = stop.Enabled = lv.SelectedItems.Count > 0;
 				look.Click += (s, e) =>

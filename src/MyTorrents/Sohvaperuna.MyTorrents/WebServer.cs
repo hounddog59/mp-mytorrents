@@ -218,7 +218,7 @@ namespace Sohvaperuna.MyTorrents
 					Collections.Suggestion c = Collections.Suggestions().FirstOrDefault(x => x.Name == Get(f, "name"));
 					if (c == null) return "/library?msg=" + Uri.EscapeDataString("Not suggested any more");
 					System.Threading.ThreadPool.QueueUserWorkItem(_ => { try { string rr = Collections.Make(c); Log.Instance().Print("Collections: " + c.Name + " - " + (rr.Length == 0 ? "done" : rr)); } catch (Exception ex) { Log.Instance().Print("Collections: " + ex.Message); } });
-					return "/library?msg=" + Uri.EscapeDataString("Moving " + c.Films.Count + " films into " + c.Name + " - give it a minute");
+					return "/library?msg=" + Uri.EscapeDataString("Moving " + c.Films.Count + " movies into " + c.Name + " - give it a minute");
 				}
 				case "missingcoll":
 				{
@@ -249,23 +249,21 @@ namespace Sohvaperuna.MyTorrents
 					else if (cf.Action == "leftover") { string r3 = CheckUp.DeleteLeftover(cf); done = r3.Length == 0 ? "Deleted the sample / advert video" : r3; }
 					return "/checkup?msg=" + Uri.EscapeDataString(done);
 				}
-				case "better":
-				case "ignorepoor":
+				case "putback": // 2026 (1.3.65): a hidden movie back on Movies to improve
+					Improve.PutBack(Get(f, "file"));
+					return "/library?msg=" + Uri.EscapeDataString("Put back - it's on Movies to improve again if it still needs it");
+				case "putbackall":
+					foreach (Improve.Item hi in Improve.Hidden()) Improve.PutBack(hi.File);
+					return "/library?msg=" + Uri.EscapeDataString("All put back");
+				case "improve":
+				case "ignoreimprove":
 				{
-					SoundUpgrades.Movie m = PoorCopies.List().FirstOrDefault(x => x.File == Get(f, "file"));
+					// 2026 (1.3.65): Movies to improve - one list
+					Improve.Item m = Improve.List().FirstOrDefault(x => x.File == Get(f, "file"));
 					if (m == null) return "/library?msg=" + Uri.EscapeDataString("Not on the list any more");
-					if (a == "better") PoorCopies.Look(m);
-					else PoorCopies.Ignore(m);
-					return "/library?msg=" + Uri.EscapeDataString(a == "better" ? m.Display + " is on Wanted movies to replace" : "OK - " + m.Display + " stays as it is");
-				}
-				case "upgrade":
-				case "ignorestereo":
-				{
-					SoundUpgrades.Movie m = SoundUpgrades.StereoMovies().FirstOrDefault(x => x.File == Get(f, "file"));
-					if (m == null) return "/library?msg=" + Uri.EscapeDataString("Not on the list any more");
-					if (a == "upgrade") SoundUpgrades.Look(m);
-					else SoundUpgrades.Ignore(m);
-					return "/library?msg=" + Uri.EscapeDataString(a == "upgrade" ? m.Display + " is on Wanted movies as a 5.1 upgrade" : "OK - " + m.Display + " stays as it is");
+					if (a == "improve") Improve.Look(m);
+					else Improve.Ignore(m);
+					return "/library?msg=" + Uri.EscapeDataString(a == "improve" ? Improve.Added(m) : "OK - " + m.Display + " stays as it is");
 				}
 				case "filemovie":
 					MovieFiling.Pending p = MovieFiling.Waiting().FirstOrDefault(x => x.From == Get(f, "from"));
@@ -451,6 +449,15 @@ namespace Sohvaperuna.MyTorrents
   if(st.col!==undefined)sort(st.col,st.dir||1);hide();
  })(tables[ti],ti);
 })();
+// 2026 (1.3.64): pressing a button (Find 5.1, Not this one, Add...) comes back to the same spot on the page,
+// not the top - remembered just for that one page load
+(function(){
+ try{var s=JSON.parse(sessionStorage.getItem('mt:scroll')||'null');sessionStorage.removeItem('mt:scroll');
+  if(s&&s.p===location.pathname)window.scrollTo(0,s.y);}catch(e){}
+ var fs=document.querySelectorAll('form');
+ for(var i=0;i<fs.length;i++)fs[i].addEventListener('submit',function(e){if((e.target.method||'').toLowerCase()!='post')return;
+  try{sessionStorage.setItem('mt:scroll',JSON.stringify({p:location.pathname,y:window.scrollY}))}catch(x){}});
+})();
 ";
 
 		private static void Shows(StringBuilder b)
@@ -484,7 +491,7 @@ namespace Sohvaperuna.MyTorrents
 			b.Append("<h2>Wanted movies (" + films.Count + ")</h2><form method=post><input type=hidden name=a value=addmovie>Title <input name=title size=30> Year <input name=year size=5> <button>Add</button></form>");
 			b.Append("<p>" + Button("reread", "Read my movies again") + "</p><table><tr><th>Movie</th><th>Year</th><th>State</th><th>Added</th><th>Last look</th><th></th></tr>");
 			foreach (WantedFilms.Film x in films)
-				b.Append("<tr><td>" + H(x.Title + (x.Replace.Length > 0 ? (x.Better ? " - better copy" : " - 5.1 upgrade") : "")) +
+				b.Append("<tr><td>" + H(x.Title + (x.Replace.Length > 0 ? (x.Best ? " - better copy (5.1 if there is one)" : x.Better ? " - better copy" : " - 5.1 upgrade") : "")) +
 					" <a class=small href=\"https://www.themoviedb.org/search/movie?query=" + H(Uri.EscapeDataString(x.Title)) + (x.Year.Length > 0 ? "%20y:" + H(x.Year) : "") + "\" target=_blank>TMDb</a></td><td>" + H(x.Year) + "</td><td class=dim>" + H(WantedFilms.StateText(x)) + "</td><td class=dim data-v=\"" + (x.Added.Ticks / 10000000L) + "\">" + x.Added.ToString("d MMM yyyy") +
 					"</td><td class=dim data-v=\"" + (x.LastLook.Ticks / 10000000L) + "\">" + (x.LastLook == DateTime.MinValue ? "-" : x.LastLook.ToString("ddd d MMM h:mm tt")) + "</td><td>" + Button("lookmovie", "Look now", "title", x.Title, "year", x.Year) + Button("removemovie", "Remove", "title", x.Title, "year", x.Year) + "</td></tr>");
 			b.Append("</table>");
@@ -507,21 +514,33 @@ namespace Sohvaperuna.MyTorrents
 		private static void Library(StringBuilder b)
 		{
 			List<Collections.Suggestion> coll = Collections.Suggestions();
-			b.Append("<h2>Collections you could make (" + coll.Count + ")</h2><p class=dim>From Moving Pictures. \"Move them\" moves the films' folders into " + H(Collections.Root) + ".</p><table><tr><th>Collection</th><th>Your films</th><th></th></tr>");
+			b.Append("<h2>Collections you could make (" + coll.Count + ")</h2><p class=dim>From Moving Pictures. \"Move them\" moves the movies' folders into " + H(Collections.Root) + ".</p><table><tr><th>Collection</th><th>Your movies</th><th></th></tr>");
 			foreach (Collections.Suggestion c in coll)
 				b.Append("<tr><td>" + H(c.Name) + (c.FolderExists ? " <span class=dim>(add to yours)</span>" : "") + "</td><td class=dim>" + H(string.Join(", ", c.Films.Select(x => x.Display))) + "</td><td>" +
 					Button("makecoll", "Move them", "name", c.Name) + Button("missingcoll", "What's missing", "name", c.Name) + Button("ignorecoll", "Not this one", "name", c.Name) + "</td></tr>");
 			b.Append("</table>");
-			List<SoundUpgrades.Movie> st = SoundUpgrades.StereoMovies();
-			b.Append("<h2>Stereo-only movies (" + st.Count + ")</h2><p class=dim>\"Find 5.1\" puts it on Wanted movies as an upgrade" + (SoundUpgrades.DeleteOld ? "; the stereo copy is deleted once the 5.1 one is in place." : "; both copies are kept.") + "</p><table><tr><th>Movie</th><th>Sound</th><th>Picture</th><th></th></tr>");
-			foreach (SoundUpgrades.Movie m in st)
-				b.Append("<tr><td>" + H(m.Display) + "</td><td>" + H(m.Channels) + "</td><td class=dim>" + H(m.Resolution) + "</td><td>" + Button("upgrade", "Find 5.1", "file", m.File) + Button("ignorestereo", "Not this one", "file", m.File) + "</td></tr>");
+			// 2026 (1.3.65): poor copies and stereo-only movies in one list, with the year to sort by
+			List<Improve.Item> imp = Improve.List();
+			b.Append("<h2>Movies to improve (" + imp.Count + ")</h2><p class=dim>Poor copies (too small, or a lower picture than " + H(Films.Quality) + ") and stereo-only movies. " +
+				"The button looks for the best it can: a poor copy that's also stereo gets a better copy - 5.1 if there is one, a better stereo one if not. " +
+				(SoundUpgrades.DeleteOld ? "The old copy is deleted once the new one is in place." : "Both copies are kept.") + " Click a heading to sort.</p>" +
+				"<table><tr><th>Movie</th><th>Year</th><th>Picture</th><th>Sound</th><th>Size</th><th></th></tr>");
+			foreach (Improve.Item m in imp)
+				b.Append("<tr><td>" + H(m.Title) + "</td><td>" + (m.Year > 0 ? m.Year.ToString() : "") + "</td><td" + (m.Poor.Length > 0 ? "" : " class=dim") + ">" + H(m.PictureText + (m.Resolution.Length > 0 && m.Poor.Length == 0 ? " (" + m.Resolution + ")" : "")) +
+					"</td><td" + (m.Stereo ? "" : " class=dim") + ">" + H(m.SoundText) + "</td><td class=dim data-v=\"" + m.Size + "\">" + (m.Size > 0 ? Films.SizeText(m.Size / 1024 / 1024) : "") + "</td><td>" +
+					Button("improve", m.Button, "file", m.File) + Button("ignoreimprove", "Not this one", "file", m.File) + "</td></tr>");
 			b.Append("</table>");
-			List<SoundUpgrades.Movie> poor = PoorCopies.List(); // 2026 (1.3.49)
-			b.Append("<h2>Poor copies (" + poor.Count + ")</h2><p class=dim>Smaller than they should be, or a lower picture than " + H(Films.Quality) + ". \"Find a better one\" puts it on Wanted movies to replace.</p><table><tr><th>Movie</th><th>Why</th><th></th></tr>");
-			foreach (SoundUpgrades.Movie m in poor)
-				b.Append("<tr><td>" + H(m.Display) + "</td><td class=dim>" + H(m.Channels) + "</td><td>" + Button("better", "Find a better one", "file", m.File) + Button("ignorepoor", "Not this one", "file", m.File) + "</td></tr>");
-			b.Append("</table>");
+			// 2026 (1.3.65): the ones you said "Not this one" to - look them over, put them back
+			List<Improve.Item> hid = Improve.Hidden();
+			b.Append("<h3>Hidden - you said \"Not this one\" (" + hid.Count + ")</h3>");
+			if (hid.Count == 0) b.Append("<p class=dim>None.</p>");
+			else
+			{
+				b.Append("<p class=dim>\"Put back\" returns it to Movies to improve (if it still needs it). " + Button("putbackall", "Put them all back") + "</p><table><tr><th>Movie</th><th>Year</th><th>Size</th><th></th></tr>");
+				foreach (Improve.Item h in hid)
+					b.Append("<tr><td>" + H(h.Title) + "</td><td>" + (h.Year > 0 ? h.Year.ToString() : "") + "</td><td class=dim data-v=\"" + h.Size + "\">" + (h.Size > 0 ? Films.SizeText(h.Size / 1024 / 1024) : "") + "</td><td>" + Button("putback", "Put back", "file", h.File) + "</td></tr>");
+				b.Append("</table>");
+			}
 		}
 
 		private static void NotFound(StringBuilder b)

@@ -23,7 +23,8 @@ namespace Sohvaperuna.MyTorrents
 		private static readonly Regex Movie = new Regex(
 			@"^(?<title>.+?)[\s._\-\[\(]+(?<year>(?:19|20)\d{2})(?:[\s._\-\]\)]|$)", RegexOptions.Compiled);
 
-		private static readonly Regex LeadingTag = new Regex(@"^\s*(\[[^\]]*\]|\([^\)]*\)|www\.\S+\s*-\s*)\s*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+		// 1.3.63: also age tags at the front - "18+.2050.2019..." was filed as "18+ 2050 (2019)" (Mark couldn't find it)
+		private static readonly Regex LeadingTag = new Regex(@"^\s*(\[[^\]]*\]|\([^\)]*\)|www\.\S+\s*-\s*|(?:18|16|15|13|12)\+(?=[\s._\-])|R18(?=[\s._\-])|X18(?=[\s._\-]))[\s._\-]*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
 		public static bool TryEpisode(string text, out string show, out int season, out string episodeCode)
 		{

@@ -61,6 +61,8 @@ namespace Sohvaperuna.MyTorrents
 			new[] { "Title.Year.1080p", "{title}.{year}.{quality}" },
 			// A library named by Media Center Master: "Revenant, The (2016) [7.5][1080p BluRay HEVC AC3][Western]"
 			new[] { "Title, The (Year) [7.5][1080p BluRay HEVC AC3][Genre]  (like Media Center Master)", "{sorttitle} ({year}) [{rating}][{quality} {source} {codec} {audio}][{genre}]" },
+			// 1.3.63: the same without the rating - it changes over time (Mark)
+			new[] { "Title, The (Year) [1080p BluRay HEVC AC3][Genre]", "{sorttitle} ({year}) [{quality} {source} {codec} {audio}][{genre}]" },
 		};
 
 		public static readonly string[][] MovieFolderStyles =
@@ -238,6 +240,8 @@ namespace Sohvaperuna.MyTorrents
 			new[] { "Show  (as MP-TVSeries names it)", "" },
 			new[] { "Show (Year)", "{title} ({year})" },
 			new[] { "Show, The (Year) [7.9][Genre]  (like Media Center Master)", "{sorttitle} ({year}) [{rating}][{genre}]" },
+			// 1.3.63: without the rating - it changes over time, and then the folder name would too (Mark)
+			new[] { "Show, The (Year) [Genre]", "{sorttitle} ({year}) [{genre}]" },
 		};
 
 		public static string ShowFolderPattern => (Configuration.GetExtra("Finished.ShowFolderPattern", "") ?? "").Trim();

@@ -29,11 +29,33 @@ namespace Sohvaperuna.MyTorrents
 			}
 		}
 
+		/// 2026 (1.3.65): "Not this one" hides it from Stereo-only too when it's on both lists.
 		public static void Ignore(SoundUpgrades.Movie m)
+		{
+			IgnoreOnly(m.File);
+			if (SoundUpgrades.StereoFiles().Contains(m.File)) SoundUpgrades.IgnoreOnly(m.File);
+		}
+
+		/// 2026 (1.3.65): the hidden ones, to look over and put back.
+		public static HashSet<string> IgnoredFiles() => Ignored();
+
+		public static void Unignore(string file)
 		{
 			try
 			{
-				File.AppendAllText(IgnoreFile, m.File + Environment.NewLine);
+				if (!File.Exists(IgnoreFile)) return;
+				File.WriteAllLines(IgnoreFile, File.ReadAllLines(IgnoreFile).Where(l => l.Length > 0 && !l.Equals(file, StringComparison.OrdinalIgnoreCase)).ToArray());
+			}
+			catch
+			{
+			}
+		}
+
+		public static void IgnoreOnly(string file)
+		{
+			try
+			{
+				File.AppendAllText(IgnoreFile, file + Environment.NewLine);
 			}
 			catch
 			{
@@ -60,10 +82,24 @@ namespace Sohvaperuna.MyTorrents
 			return "";
 		}
 
+		/// 2026 (1.3.65): every poor copy (file -> why), whatever was said about it.
+		public static Dictionary<string, string> PoorFiles()
+		{
+			Dictionary<string, string> d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+			foreach (SoundUpgrades.Movie m in All()) d[m.File] = m.Channels;
+			return d;
+		}
+
 		public static List<SoundUpgrades.Movie> List()
 		{
 			HashSet<string> ignored = Ignored();
 			HashSet<string> trying = new HashSet<string>(WantedFilms.Read().Where(f => f.Replace.Length > 0 && f.State != "have").Select(f => f.Replace), StringComparer.OrdinalIgnoreCase);
+			List<SoundUpgrades.Movie> list = All().Where(m => !ignored.Contains(m.File) && !trying.Contains(m.File)).ToList();
+			return list.OrderBy(m => m.Title).ThenBy(m => m.Year).ToList();
+		}
+
+		private static List<SoundUpgrades.Movie> All()
+		{
 			List<SoundUpgrades.Movie> list = new List<SoundUpgrades.Movie>();
 			foreach (string row in LibraryFolders.Read("movingpictures.db3",
 				"select ifnull(m.title,'') || char(9) || ifnull(m.year,0) || char(9) || ifnull(f.fullpath,'') || char(9) || ifnull(f.audiochannels,'') || char(9) || ifnull(f.filesize,0) || char(9) || ifnull(f.videoresolution,'') || char(9) || ifnull(f.videocodec,'') || char(9) || ifnull(f.duration,0) " +
@@ -71,7 +107,7 @@ namespace Sohvaperuna.MyTorrents
 				"where (f.ignored = 0 or f.ignored is null)"))
 			{
 				string[] p = row.Split('\t');
-				if (p.Length < 8 || p[2].Length == 0 || ignored.Contains(p[2]) || trying.Contains(p[2])) continue;
+				if (p.Length < 8 || p[2].Length == 0) continue;
 				if (Regex.IsMatch(Path.GetFileNameWithoutExtension(p[2]), @"^(backdrop\d*|folder|fanart\d*|poster|theme|trailer|sample)\b|-(trailer|sample)$", RegexOptions.IgnoreCase)) continue;
 				int y;
 				long size;
@@ -92,12 +128,13 @@ namespace Sohvaperuna.MyTorrents
 				if (why.Length == 0) continue;
 				list.Add(new SoundUpgrades.Movie { Title = p[0], Year = y, File = p[2], Channels = why, Size = size, Resolution = res });
 			}
-			return list.OrderBy(m => m.Title).ThenBy(m => m.Year).ToList();
+			return list;
 		}
 
-		public static bool Look(SoundUpgrades.Movie m) => WantedFilms.AddUpgrade(m.Title, m.Year > 0 ? m.Year.ToString() : "", m.File, "better");
+		/// 2026 (1.3.65): stereo as well = look for the best: a better copy, 5.1 if there is one.
+		public static bool Look(SoundUpgrades.Movie m) => Look(m.Title, m.Year, m.File);
 
 		/// Any movie you have (e.g. from the check-up): by its file.
-		public static bool Look(string title, int year, string file) => WantedFilms.AddUpgrade(title, year > 0 ? year.ToString() : "", file, "better");
+		public static bool Look(string title, int year, string file) => WantedFilms.AddUpgrade(title, year > 0 ? year.ToString() : "", file, SoundUpgrades.StereoFiles().Contains(file) ? "best" : "better");
 	}
 }

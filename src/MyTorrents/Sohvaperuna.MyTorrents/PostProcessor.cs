@@ -60,7 +60,12 @@ namespace Sohvaperuna.MyTorrents
 			if (session == null || t == null || string.IsNullOrEmpty(t.Hash)) return "nothing picked";
 			if (t.Progress >= 100.0) return "it is already finished";
 			if (t.Progress < 95.0) return "it is only " + t.Progress.ToString("0.#") + "% done - at least 95% is needed";
-			if (WasCopied(t.Hash)) return "it has already been copied";
+			if (WasCopied(t.Hash))
+			{
+				// 1.3.63: copied earlier, but that copy isn't there any more (moved, renamed or deleted since) - copy it again
+				if (!CopiedFileGone(t.Hash)) return "it has already been copied";
+				Log.Instance().Print("Finished downloads: [" + t.Name + "] the copy made earlier isn't there any more - copying it again");
+			}
 			lock (_lock)
 			{
 				_early[t.Hash] = 0.95;
@@ -355,7 +360,7 @@ namespace Sohvaperuna.MyTorrents
 				string root = kind == SearchContext.TV ? TVFolder : MovieFolder;
 				if (string.IsNullOrEmpty(root))
 				{
-					Done(torrent, "failed", "no " + (kind == SearchContext.TV ? "TV" : "film") + " folder set (MyTorrents Configuration > When finished)", null);
+					Done(torrent, "failed", "no " + (kind == SearchContext.TV ? "TV" : "movie") + " folder set (MyTorrents Configuration > When finished)", null);
 					return;
 				}
 				if (!Directory.Exists(root))
@@ -380,6 +385,7 @@ namespace Sohvaperuna.MyTorrents
 				Done(torrent, "copied", (early > 0 ? "used at " + torrent.Progress.ToString("0.0") + "% (no seeds for the last bit, the video looked whole) - " : "")
 					+ "copied to " + string.Join(", ", copied), copied[0]);
 				if (kind == SearchContext.Movie) RescanMovingPictures();
+				else Grabbed.ReleaseMissing(torrent.Hash, copied); // 2026 (1.3.66): a "season pack" that was short of episodes
 				Popup(early > 0 ? "Nearly finished - copied anyway" : "Copied to your library", Path.GetFileNameWithoutExtension(copied[0]) + (copied.Count > 1 ? $" (+{copied.Count - 1} more)" : ""));
 			}
 			catch (Exception ex)
@@ -805,6 +811,29 @@ namespace Sohvaperuna.MyTorrents
 						return t.GetAttribute("hash");
 			}
 			return "";
+		}
+
+		/// 1.3.63: it was copied, but the copied file isn't where it was put - forgets it was copied (so it can be copied again)
+		private static bool CopiedFileGone(string hash)
+		{
+			lock (_lock)
+			{
+				try
+				{
+					XmlDocument doc = LoadStore();
+					XmlElement e = Find(doc, hash);
+					string dest = e?.GetAttribute("dest") ?? "";
+					if (e == null || e.GetAttribute("state") != "copied" || dest.Length == 0 || System.IO.File.Exists(dest)) return false;
+					e.SetAttribute("state", "downloading");
+					e.SetAttribute("note", "the copy made earlier wasn't there any more (" + dest + ") - copied again");
+					doc.Save(StoreFile);
+					return true;
+				}
+				catch
+				{
+					return false;
+				}
+			}
 		}
 
 		/// 2026 (1.3.51): true when this download finished (copied into the library, or dealt with after finishing).

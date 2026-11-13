@@ -3,6 +3,57 @@
 Newest first. The plugin was revived in 2026 from the last 2018 build (0.80);
 1.1 was the first build that loads in 64-bit MediaPortal again.
 
+## 1.3.66
+
+- **Duplicates check: a much stronger safeguard.** Two files with the same episode number are now treated as *different* episodes - never offered as copies - when their names show different air dates (more than two months apart), different season folders, or different real titles. The old check deleted about 45 real episodes this way (Monster's three seasons all called S01, The Haunting's Hill House vs Bly Manor, Trailer Park Boys Out of the Park, The Twilight Zone 2002, one Inspector George Gently).
+- MyTorrents Configuration opens on the tab you were on last time (unless a setup step still needs doing).
+- A "season pack" that turns out to be short of episodes (The Haunting S02 was just episode 1) no longer blocks the missing ones for a week - they're looked for again at the next search.
+
+## 1.3.65
+
+- Poor copies and Stereo-only movies are one list now - **Movies to improve** - with the buttons in each row and a Year column (click a heading to sort, by year too; "Sort by year" in MediaPortal).
+- Each movie looks for the best it can: a poor copy that's also stereo gets a better copy - 5.1 if there is one, a better stereo one if not (it used to fix only half: Find 5.1 took any 5.1 copy, even a poor one, and Find a better one didn't try for 5.1). A poor copy gets a better copy; a stereo-only movie with a good picture gets a 5.1 copy.
+- "Not this one" hides it, whatever the reason it was on the list - and the hidden ones have their own list (under Movies to improve on the web page, "Hidden..." in Configuration, "Hidden" in the MediaPortal menu) to look over and **Put back**, one at a time or all at once.
+- Same in MediaPortal, MyTorrents Configuration, the web page and the Check-up.
+
+## 1.3.64
+
+- Web page: pressing a button further down a list (Find 5.1, Not this one, Ignore, Add...) brings you back to the same spot instead of the top of the page.
+
+## 1.3.63
+
+- Age tags at the front of a download's name ("18+.2050.2019...", "[18+]", "R18") are left out of the movie's name - "18+ 2050 (2019)" sorted at the top of Movies and Moving Pictures didn't recognise it. Titles that really start with a number (1917, 13 Hours, 12.12: The Day) aren't affected.
+- When finished: show-folder and movie styles without the rating - "Show, The (Year) [Genre]" and "Title, The (Year) [1080p BluRay HEVC AC3][Genre]" - since ratings change and the names would change with them.
+- "Use it now" works again on a download that was copied earlier when that copy isn't there any more (moved, renamed or deleted since) - it used to say "it has already been copied".
+
+## 1.3.62
+
+- Drop folder: when you already have everything in something you dropped in (a whole season pack you've got), the check-up says so - "you already have everything in it (96 files) - you can delete it" - and Fix it says "Delete it - you have it all" (several at once too).
+- Drop folder: what was already tried is remembered across restarts, so an unchanged pack isn't gone through again at every start.
+- A sample-video note said "film" - now "movie" like everywhere else.
+
+## 1.3.61
+
+- Duplicates: two files MP-TVSeries matched to one episode whose names say different episodes ("S01E04" / "S02E01", or "Terror of the Zygons (1)" / "(3)") are a wrong match, not copies - never suggested, never in "Do the easy ones", and the reason says so. 1.3.59 / 1.3.60 hid 33 such episodes on Mark's HTPC (put back with "Put back wrongly hidden episodes.bat").
+- Installer: the desktop icon step finds the MediaPortal folder from the installer's own location (MediaPortal's Config class isn't always available to installer scripts).
+
+## 1.3.60
+
+- "Movies" everywhere: the last places that said "film" (Duplicates, Collections, Rename my movies, the web page, the installer and the README) now say "movie", the same as the Movies tab, Moving Pictures, Plex and Trakt. Settings keep their old internal names, so nothing is lost.
+- The desktop icon stays where you put it: updates no longer delete it and make a new one (Windows put the new one in the next free spot). It's only made when it's missing; "Remove MyTorrents" takes it away.
+- Duplicates, done again so it's easy to follow: one at a time - "which copy do you want to keep?" - with the reason it's on the list in plain words (two files matched to one episode, in different shows' folders = probably a wrong match, an extended version, a part, the same file twice...), each copy's picture, sound, size, file and folder (click to open), and big buttons: "Keep this one" (the others are hidden, nothing deleted), "Keep them all - they're different", "Skip for now", "< Back". "Do the easy ones for me" sorts out the ones with no doubt in one go (the same file twice, or one clearly better picture / English sound). "Hidden copies" puts them back or deletes them for good.
+- Every list can be sorted by clicking a column heading (click again to reverse; remembered): now also Wanted movies (with new Year and Added columns), the Check-up, Collections you could make, Rename my movies, File new movies and Can't find.
+- Check-up: pick several lines at once (Ctrl / Shift) - Fix it and Ignore work on all of them ("Delete these 5 copies", "Ignore these 12"), as long as they need the same kind of fix.
+- Duplicates: files that are "Part 1" and "Part 2" of one episode or movie aren't shown as duplicates any more; copies in different shows' folders (Prime Suspect (1991) matched to Prime Suspect 1973) are never ticked - the note says it's probably a wrong match in MP-TVSeries.
+
+## 1.3.59
+
+- Check-up tab -> "Find duplicates...": every episode MP-TVSeries has two files for, and every film Moving Pictures has in two copies (parts 2, 3... of a film don't count). The copy to keep is suggested and shown in bold - the better picture, then English sound, then better sound, then the bigger file - and the others are ticked. Different versions (extended, director's cut, uncut...) are never ticked for you.
+- "Set aside the ticked ones" adds ".duplicate" to the end of the name, right where the file is (with its subtitles / .nfo / thumbnails), so nothing is deleted yet and MP-TVSeries / Moving Pictures drop it at their next scan. "Set aside earlier..." puts them all back or deletes them for good. Every copy of something can never be set aside. "Not duplicates - stop showing this one" for ones that really are different.
+
+- Check-up: a film counts as "in place" with a year either side too - Media Center Master often renames with the local release year ("City of God (2002)" -> "(2003)"), which made notes say it wasn't where MyTorrents put it.
+- Check-up tab: the Fix it / Open folder / Ignore buttons sit under the explanation, above the list, and the explanation is no longer cut off.
+
 ## 1.3.58
 
 - No more endless menus: every MyTorrents menu and pop-up stops when MediaPortal is closing, or when menus keep closing faster than anyone could press a button (MediaPortal froze when closed with the Auto grabber menu open - 24,000 reopenings in 2 1/2 minutes).

@@ -52,9 +52,19 @@ namespace Sohvaperuna.MyTorrents
 			});
 		}
 
+		public const string HaveItAll = "you already have everything in it";
+		private static bool _loadedTried;
+
 		private static void Run(string folder)
 		{
 			if (!Directory.Exists(folder)) return;
+			// 1.3.62: what was already tried is remembered across restarts (MyTorrents.drop-left.txt), so an unchanged
+			// pack isn't gone through again at every start (Highlander: 96 "you already have this" lines each time)
+			if (!_loadedTried)
+			{
+				_loadedTried = true;
+				foreach (var kv in Stamps()) Tried[kv.Key] = kv.Value;
+			}
 			Dictionary<string, string> left = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 			foreach (string item in Directory.GetFileSystemEntries(folder))
 			{
@@ -72,9 +82,9 @@ namespace Sohvaperuna.MyTorrents
 					continue;
 				}
 				string why = FileIt(item, name, videos);
+				Tried[item] = stamp;
 				if (why.Length > 0)
 				{
-					Tried[item] = stamp;
 					left[item] = why;
 					Log.Instance().Print("Drop folder: " + name + " left where it is - " + why);
 				}
@@ -112,6 +122,10 @@ namespace Sohvaperuna.MyTorrents
 			try
 			{
 				List<string> done = PostProcessor.FileVideos(root, kind, "", name, videos, true);
+				// 1.3.62: nothing filed because you already have every one of them - say so, so the check-up can offer to delete it
+				List<string> stayed = videos.Where(v => SafeExists(v)).ToList();
+				if (done.Count == 0 && stayed.Count > 0 && stayed.All(v => PostProcessor.SkipNotes.Any(x => x.StartsWith(Path.GetFileName(v) + ": you already have", StringComparison.OrdinalIgnoreCase))))
+					return HaveItAll + " (" + stayed.Count + (stayed.Count == 1 ? " file" : " files") + ") - you can delete it";
 				string notes = string.Join("; ", PostProcessor.SkipNotes);
 				if (done.Count == 0) return notes.Length > 0 ? notes : "couldn't work out a name for it";
 				int still = videos.Count(v => SafeExists(v));
@@ -198,14 +212,52 @@ namespace Sohvaperuna.MyTorrents
 
 		private static string LeftReason(string item) => Left().TryGetValue(item, out string why) ? why : "";
 
+		/// path -> the size|time it had when it was tried (third column of MyTorrents.drop-left.txt)
+		private static Dictionary<string, string> Stamps()
+		{
+			Dictionary<string, string> d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+			try
+			{
+				if (!System.IO.File.Exists(LeftFile)) return d;
+				foreach (string line in System.IO.File.ReadAllLines(LeftFile))
+				{
+					string[] p = line.Split('\t');
+					if (p.Length >= 3 && p[2].Length > 0) d[p[0]] = p[2];
+				}
+			}
+			catch
+			{
+			}
+			return d;
+		}
+
 		private static void SaveLeft(Dictionary<string, string> left)
 		{
 			try
 			{
-				System.IO.File.WriteAllLines(LeftFile, left.Select(kv => kv.Key + "\t" + kv.Value));
+				System.IO.File.WriteAllLines(LeftFile, left.Select(kv => kv.Key + "\t" + kv.Value + "\t" + (Tried.TryGetValue(kv.Key, out string st) ? st : "")));
 			}
 			catch
 			{
+			}
+		}
+
+		/// 1.3.62: the check-up's "Delete it" for something you already have all of. "" = done, else why not.
+		public static string Delete(string item)
+		{
+			try
+			{
+				if (Directory.Exists(item)) Directory.Delete(item, true);
+				else if (System.IO.File.Exists(item)) System.IO.File.Delete(item);
+				Dictionary<string, string> left = Left();
+				if (left.Remove(item)) SaveLeft(left);
+				Tried.Remove(item);
+				Log.Instance().Print("Drop folder: deleted " + Path.GetFileName(item) + " (you already had everything in it)");
+				return "";
+			}
+			catch (Exception ex)
+			{
+				return ex.Message;
 			}
 		}
 	}

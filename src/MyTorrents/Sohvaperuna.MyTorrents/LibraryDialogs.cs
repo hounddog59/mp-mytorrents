@@ -82,16 +82,17 @@ namespace Sohvaperuna.MyTorrents
 			{
 				Label l = new Label
 				{
-					Text = list.Count == 0 ? "Nothing to suggest - every film that belongs to a collection is already in one (or you said no)." :
-						"From Moving Pictures' own information. Tick the ones to do, then \"Move them\" - the films' folders are moved into your Collections folder (" + Collections.Root + "). Nothing else changes.",
+					Text = list.Count == 0 ? "Nothing to suggest - every movie that belongs to a collection is already in one (or you said no)." :
+						"From Moving Pictures' own information. Tick the ones to do, then \"Move them\" - the movies' folders are moved into your Collections folder (" + Collections.Root + "). Nothing else changes.",
 					Location = new Point(10, 10), Size = new Size(780, 30), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
 				};
 				ListView lv = new ListView { View = View.Details, CheckBoxes = true, FullRowSelect = true, Location = new Point(10, 44), Size = new Size(780, 340), Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right };
 				lv.Columns.Add("Collection", 220);
 				lv.Columns.Add("What", 120);
-				lv.Columns.Add("Your films", 420);
+				lv.Columns.Add("Your movies", 420);
 				foreach (Collections.Suggestion s in list)
-					lv.Items.Add(new ListViewItem(new[] { s.Name, s.FolderExists ? "add to yours" : "new (" + s.Films.Count + " films)", string.Join(", ", s.Films.Select(x => x.Display)) }) { Tag = s });
+					lv.Items.Add(new ListViewItem(new[] { s.Name, s.FolderExists ? "add to yours" : "new (" + s.Films.Count + " movies)", string.Join(", ", s.Films.Select(x => x.Display)) }) { Tag = s });
+				new ListSorter(lv, "Collections").Apply(); // 1.3.60: click a heading to sort, like every other list
 				AddOpen(lv, i => ((Collections.Suggestion)i.Tag).Films.Select(x => x.File).FirstOrDefault());
 				LookUp.AddTo(lv, i => LookUp.What.Collection(((Collections.Suggestion)i.Tag).Name)); // 1.3.52
 				Button move = new Button { Text = "Move them", Location = new Point(10, 396), AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
@@ -111,7 +112,7 @@ namespace Sohvaperuna.MyTorrents
 					List<Collections.Suggestion> pick = lv.CheckedItems.Cast<ListViewItem>().Select(i => (Collections.Suggestion)i.Tag).ToList();
 					if (pick.Count == 0) return;
 					move.Enabled = no.Enabled = missing.Enabled = false;
-					note.Text = "Moving " + pick.Sum(x => x.Films.Count) + " films - on a NAS this can take a while...";
+					note.Text = "Moving " + pick.Sum(x => x.Films.Count) + " movies - on a NAS this can take a while...";
 					BackgroundWorker w = new BackgroundWorker();
 					List<string> problems = new List<string>();
 					w.DoWork += (s2, e2) => { foreach (Collections.Suggestion x in pick) { string r = Collections.Make(x); if (r.Length > 0) problems.Add(r); } };
@@ -162,74 +163,12 @@ namespace Sohvaperuna.MyTorrents
 			}
 		}
 
-		public static void StereoWindow(IWin32Window owner)
-		{
-			List<SoundUpgrades.Movie> list = SoundUpgrades.StereoMovies();
-			using (Form f = NewForm(owner, "Stereo-only movies", 800, 460))
-			{
-				Label l = new Label
-				{
-					Text = list.Count + " movies have only stereo (or mono) sound, from Moving Pictures' own information. Tick the ones to look for a 5.1 copy of - they go on Wanted movies as upgrades (" +
-						Films.Quality + ", up to " + Films.SizeText(Films.MaxSizeMB) + ").",
-					Location = new Point(10, 10), Size = new Size(780, 30), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-				};
-				ListView lv = new ListView { View = View.Details, CheckBoxes = true, FullRowSelect = true, Location = new Point(10, 44), Size = new Size(780, 330), Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right };
-				lv.Columns.Add("Movie", 300);
-				lv.Columns.Add("Sound", 70);
-				lv.Columns.Add("Picture", 70);
-				lv.Columns.Add("Size", 70);
-				lv.Columns.Add("File", 250);
-				foreach (SoundUpgrades.Movie m in list)
-					lv.Items.Add(new ListViewItem(new[] { m.Display, m.Channels, m.Resolution, m.Size > 0 ? (m.Size / 1024 / 1024) + " MB" : "", m.File }) { Tag = m });
-				new ListSorter(lv, "Stereo");
-				AddOpen(lv, i => ((SoundUpgrades.Movie)i.Tag).File, i => Tuple.Create(((SoundUpgrades.Movie)i.Tag).Title, ((SoundUpgrades.Movie)i.Tag).Year));
-				CheckBox del = new CheckBox { Text = "Delete the stereo copy once the 5.1 one is safely in place (untick to keep both)", AutoSize = true, Checked = SoundUpgrades.DeleteOld, Location = new Point(10, 382), Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
-				CheckBox auto = new CheckBox { Text = "Look for " + SoundUpgrades.AutoPerDay + " of these by themselves each day", AutoSize = true, Checked = SoundUpgrades.Auto, Location = new Point(10, 404), Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
-				Button look = new Button { Text = "Look for 5.1", Location = new Point(10, 428), AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
-				Button no = new Button { Text = "Not these", Location = new Point(110, 428), AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
-				Button all = new Button { Text = "Tick all", Location = new Point(200, 428), Width = 80, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
-				Label note = new Label { Location = new Point(290, 433), AutoSize = true, ForeColor = Color.DimGray, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
-				Button close = new Button { Text = "Close", DialogResult = DialogResult.Cancel, Location = new Point(710, 428), Width = 80, Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
-				del.CheckedChanged += (s, e) => Configuration.SetExtra("Films.UpgradeDeleteOld", del.Checked ? "true" : "false");
-				auto.CheckedChanged += (s, e) => Configuration.SetExtra("Films.UpgradeAuto", auto.Checked ? "true" : "false");
-				// 2026 (1.3.48): "Tick all" / "Untick all" - the button says what it will do
-				all.Click += (s, e) =>
-				{
-					bool tick = all.Text == "Tick all";
-					foreach (ListViewItem i in lv.Items) i.Checked = tick;
-				};
-				lv.ItemChecked += (s, e) => all.Text = lv.Items.Count > 0 && lv.CheckedItems.Count == lv.Items.Count ? "Untick all" : "Tick all";
-				look.Click += (s, e) =>
-				{
-					int n = 0;
-					foreach (ListViewItem i in lv.CheckedItems.Cast<ListViewItem>().ToList())
-					{
-						if (SoundUpgrades.Look((SoundUpgrades.Movie)i.Tag)) n++;
-						lv.Items.Remove(i);
-					}
-					note.Text = n + " added to Wanted movies as 5.1 upgrades.";
-				};
-				no.Click += (s, e) =>
-				{
-					foreach (ListViewItem i in lv.CheckedItems.Cast<ListViewItem>().ToList())
-					{
-						SoundUpgrades.Ignore((SoundUpgrades.Movie)i.Tag);
-						lv.Items.Remove(i);
-					}
-				};
-				f.Controls.AddRange(new Control[] { l, lv, del, auto, look, no, all, note, close });
-				f.Shown += (s9, e9) => all.Text = lv.Items.Count > 0 && lv.CheckedItems.Count == lv.Items.Count ? "Untick all" : "Tick all";
-				f.CancelButton = close;
-				f.ShowDialog(owner);
-			}
-		}
-
 		/// 2026 (1.3.49): movies whose names don't match the movie naming choice - tick and rename.
 		public static void RenameWindow(IWin32Window owner)
 		{
 			if (System.Diagnostics.Process.GetProcessesByName("MediaPortal").Length > 0)
 			{
-				MessageBox.Show(owner, "Close MediaPortal first - while it runs it has your films open, and Moving Pictures needs to be told the new names.", "Rename my movies", MessageBoxButtons.OK, MessageBoxIcon.Information);
+				MessageBox.Show(owner, "Close MediaPortal first - while it runs it has your movies open, and Moving Pictures needs to be told the new names.", "Rename my movies", MessageBoxButtons.OK, MessageBoxIcon.Information);
 				return;
 			}
 			Cursor.Current = Cursors.WaitCursor;
@@ -254,6 +193,7 @@ namespace Sohvaperuna.MyTorrents
 					lv.Items.Add(new ListViewItem(new[] { i.Display, now, becomes }) { Tag = i, ToolTipText = i.OldFile + "\r\n-> " + i.NewFile });
 				}
 				lv.ShowItemToolTips = true;
+				new ListSorter(lv, "RenameMovies").Apply(); // 1.3.60
 				AddOpen(lv, i => System.IO.File.Exists(((MovieRenamer.Item)i.Tag).NewFile) ? ((MovieRenamer.Item)i.Tag).NewFile : ((MovieRenamer.Item)i.Tag).OldFile,
 					i => Tuple.Create(((MovieRenamer.Item)i.Tag).Title, ((MovieRenamer.Item)i.Tag).Year));
 				Button go = new Button { Text = "Rename", Location = new Point(10, 440), Width = 80, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
@@ -300,35 +240,54 @@ namespace Sohvaperuna.MyTorrents
 			}
 		}
 
-		/// 2026 (1.3.49): poor copies (too small, or a lower picture than your movie quality) - look for a better one.
-		public static void PoorWindow(IWin32Window owner)
+		/// 2026 (1.3.65): Movies to improve - poor copies and stereo-only movies in one list (used to be two windows).
+		/// Each movie looks for the best it can: poor + stereo = a better copy, 5.1 if there is one; poor = a better
+		/// copy; stereo = a 5.1 copy. Sorts by any heading, the year too.
+		public static void ImproveWindow(IWin32Window owner)
 		{
-			List<SoundUpgrades.Movie> list = PoorCopies.List();
-			using (Form f = NewForm(owner, "Poor copies - look for a better one", 860, 460))
+			List<Improve.Item> list = Improve.List();
+			using (Form f = NewForm(owner, "Movies to improve", 940, 480))
 			{
 				Label l = new Label
 				{
-					Text = list.Count + " movies are smaller than they should be for their picture, or a lower picture than " + Films.Quality + " (from Moving Pictures). " +
-						"Tick the ones to replace - they go on Wanted movies; a copy only counts when it is " + Films.Quality + ", up to " + Films.SizeText(Films.MaxSizeMB) + " and clearly bigger than yours.",
-					Location = new Point(10, 10), Size = new Size(840, 30), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+					Text = list.Count + " movies could be better: poor copies (too small, or a lower picture than " + Films.Quality + ") and stereo-only movies, from Moving Pictures. " +
+						"Tick them and press Look for them - each one looks for what it needs (the last column). Click a heading to sort, by year too.",
+					Location = new Point(10, 10), Size = new Size(920, 30), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
 				};
-				ListView lv = new ListView { View = View.Details, CheckBoxes = true, FullRowSelect = true, Location = new Point(10, 44), Size = new Size(840, 330), Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right };
-				lv.Columns.Add("Movie", 260);
-				lv.Columns.Add("Why", 170);
-				lv.Columns.Add("Picture", 60);
+				ListView lv = new ListView { View = View.Details, CheckBoxes = true, FullRowSelect = true, Location = new Point(10, 44), Size = new Size(920, 350), Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right };
+				lv.Columns.Add("Movie", 250);
+				lv.Columns.Add("Year", 50);
+				lv.Columns.Add("Picture", 170);
+				lv.Columns.Add("Sound", 70);
 				lv.Columns.Add("Size", 70);
-				lv.Columns.Add("File", 260);
-				foreach (SoundUpgrades.Movie m in list)
-					lv.Items.Add(new ListViewItem(new[] { m.Display, m.Channels, m.Resolution, m.Size > 0 ? (m.Size / 1024 / 1024) + " MB" : "", m.File }) { Tag = m });
-				new ListSorter(lv, "Poor");
-				AddOpen(lv, i => ((SoundUpgrades.Movie)i.Tag).File, i => Tuple.Create(((SoundUpgrades.Movie)i.Tag).Title, ((SoundUpgrades.Movie)i.Tag).Year));
-				CheckBox del = new CheckBox { Text = "Delete the old copy once the better one is safely in place (untick to keep both)", AutoSize = true, Checked = SoundUpgrades.DeleteOld, Location = new Point(10, 382), Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
-				Button look = new Button { Text = "Look for a better copy", Location = new Point(10, 428), AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
-				Button no = new Button { Text = "Not these", Location = new Point(160, 428), AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
-				Button all = new Button { Text = "Tick all", Location = new Point(250, 428), Width = 80, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
-				Label note = new Label { Location = new Point(340, 433), AutoSize = true, ForeColor = Color.DimGray, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
-				Button close = new Button { Text = "Close", DialogResult = DialogResult.Cancel, Location = new Point(770, 428), Width = 80, Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
+				lv.Columns.Add("Looks for", 220);
+				lv.Columns.Add("File", 250);
+				foreach (Improve.Item m in list)
+					lv.Items.Add(new ListViewItem(new[] { m.Title, m.Year > 0 ? m.Year.ToString() : "", m.PictureText + (m.Poor.Length == 0 && m.Resolution.Length > 0 ? " (" + m.Resolution + ")" : ""), m.SoundText,
+						m.Size > 0 ? (m.Size / 1024 / 1024) + " MB" : "", m.LooksFor, m.File }) { Tag = m });
+				new ListSorter(lv, "Improve");
+				AddOpen(lv, i => ((Improve.Item)i.Tag).File, i => Tuple.Create(((Improve.Item)i.Tag).Title, ((Improve.Item)i.Tag).Year));
+				CheckBox del = new CheckBox { Text = "Delete the old copy once the new one is safely in place (untick to keep both)", AutoSize = true, Checked = SoundUpgrades.DeleteOld, Location = new Point(10, 402), Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
+				CheckBox auto = new CheckBox { Text = "Look for " + SoundUpgrades.AutoPerDay + " of the stereo ones by themselves each day", AutoSize = true, Checked = SoundUpgrades.Auto, Location = new Point(10, 424), Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
+				Button look = new Button { Text = "Look for them", Location = new Point(10, 448), AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
+				Button no = new Button { Text = "Not these", Location = new Point(120, 448), AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
+				Button all = new Button { Text = "Tick all", Location = new Point(210, 448), Width = 80, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
+				Label note = new Label { Location = new Point(300, 453), AutoSize = true, ForeColor = Color.DimGray, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
+				Button close = new Button { Text = "Close", DialogResult = DialogResult.Cancel, Location = new Point(850, 448), Width = 80, Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
+				// 2026 (1.3.65): the ones you said "Not these" to - look them over, put them back
+				Button hidden = new Button { Text = "Hidden (" + Improve.Hidden().Count + ")...", AutoSize = true, Location = new Point(730, 448), Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
+				hidden.Click += (s, e) =>
+				{
+					if (HiddenWindow(f) == 0) return;
+					// something put back - fill the list again
+					lv.Items.Clear();
+					foreach (Improve.Item m in Improve.List())
+						lv.Items.Add(new ListViewItem(new[] { m.Title, m.Year > 0 ? m.Year.ToString() : "", m.PictureText + (m.Poor.Length == 0 && m.Resolution.Length > 0 ? " (" + m.Resolution + ")" : ""), m.SoundText,
+							m.Size > 0 ? (m.Size / 1024 / 1024) + " MB" : "", m.LooksFor, m.File }) { Tag = m });
+					hidden.Text = "Hidden (" + Improve.Hidden().Count + ")...";
+				};
 				del.CheckedChanged += (s, e) => Configuration.SetExtra("Films.UpgradeDeleteOld", del.Checked ? "true" : "false");
+				auto.CheckedChanged += (s, e) => Configuration.SetExtra("Films.UpgradeAuto", auto.Checked ? "true" : "false");
 				all.Click += (s, e) =>
 				{
 					bool tick = all.Text == "Tick all";
@@ -340,23 +299,64 @@ namespace Sohvaperuna.MyTorrents
 					int n = 0;
 					foreach (ListViewItem i in lv.CheckedItems.Cast<ListViewItem>().ToList())
 					{
-						if (PoorCopies.Look((SoundUpgrades.Movie)i.Tag)) n++;
+						if (Improve.Look((Improve.Item)i.Tag)) n++;
 						lv.Items.Remove(i);
 					}
-					note.Text = n + " added to Wanted movies to replace.";
+					note.Text = n + " added to Wanted movies.";
 				};
 				no.Click += (s, e) =>
 				{
 					foreach (ListViewItem i in lv.CheckedItems.Cast<ListViewItem>().ToList())
 					{
-						PoorCopies.Ignore((SoundUpgrades.Movie)i.Tag);
+						Improve.Ignore((Improve.Item)i.Tag);
 						lv.Items.Remove(i);
 					}
 				};
-				f.Controls.AddRange(new Control[] { l, lv, del, look, no, all, note, close });
+				f.Controls.AddRange(new Control[] { l, lv, del, auto, look, no, all, note, hidden, close });
 				f.CancelButton = close;
 				f.ShowDialog(owner);
 			}
+		}
+
+		/// 2026 (1.3.65): movies hidden from Movies to improve - tick and Put back. Returns how many were put back.
+		private static int HiddenWindow(IWin32Window owner)
+		{
+			int back = 0;
+			using (Form f = NewForm(owner, "Hidden from Movies to improve", 700, 420))
+			{
+				Label l = new Label { Text = "Movies you said \"Not these\" to. Tick any to put back on Movies to improve (they come back if they still need it).", Location = new Point(10, 10), Size = new Size(680, 30), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+				ListView lv = new ListView { View = View.Details, CheckBoxes = true, FullRowSelect = true, Location = new Point(10, 44), Size = new Size(680, 320), Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right };
+				lv.Columns.Add("Movie", 260);
+				lv.Columns.Add("Year", 50);
+				lv.Columns.Add("Size", 70);
+				lv.Columns.Add("File", 280);
+				foreach (Improve.Item m in Improve.Hidden())
+					lv.Items.Add(new ListViewItem(new[] { m.Title, m.Year > 0 ? m.Year.ToString() : "", m.Size > 0 ? (m.Size / 1024 / 1024) + " MB" : "", m.File }) { Tag = m });
+				new ListSorter(lv, "ImproveHidden");
+				AddOpen(lv, i => ((Improve.Item)i.Tag).File, i => Tuple.Create(((Improve.Item)i.Tag).Title, ((Improve.Item)i.Tag).Year));
+				Button put = new Button { Text = "Put back", Location = new Point(10, 376), AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
+				Button all = new Button { Text = "Tick all", Location = new Point(100, 376), Width = 80, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
+				Button close = new Button { Text = "Close", DialogResult = DialogResult.Cancel, Location = new Point(610, 376), Width = 80, Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
+				all.Click += (s, e) =>
+				{
+					bool tick = all.Text == "Tick all";
+					foreach (ListViewItem i in lv.Items) i.Checked = tick;
+				};
+				lv.ItemChecked += (s, e) => all.Text = lv.Items.Count > 0 && lv.CheckedItems.Count == lv.Items.Count ? "Untick all" : "Tick all";
+				put.Click += (s, e) =>
+				{
+					foreach (ListViewItem i in lv.CheckedItems.Cast<ListViewItem>().ToList())
+					{
+						Improve.PutBack(((Improve.Item)i.Tag).File);
+						lv.Items.Remove(i);
+						back++;
+					}
+				};
+				f.Controls.AddRange(new Control[] { l, lv, put, all, close });
+				f.CancelButton = close;
+				f.ShowDialog(owner);
+			}
+			return back;
 		}
 	}
 }

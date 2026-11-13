@@ -221,6 +221,33 @@ namespace Sohvaperuna.MyTorrents
 			}
 		}
 
+		/// 2026 (1.3.66): a season pack has been copied - any episode it was counted for but didn't have (The Haunting
+		/// S02 was one 1.8 GB episode, not 9) is let go, so it's looked for again at the next search instead of
+		/// waiting a week. Only when every copied file name carries its SxxEyy code, so nothing is let go by mistake.
+		public static void ReleaseMissing(string hash, List<string> copied)
+		{
+			if (string.IsNullOrEmpty(hash) || copied == null || copied.Count == 0) return;
+			HashSet<string> have = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			foreach (string f in copied)
+			{
+				System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(System.IO.Path.GetFileName(f), @"S(\d{1,2})((?:-?E\d{1,3})+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+				if (!m.Success) return;
+				int season = int.Parse(m.Groups[1].Value);
+				foreach (System.Text.RegularExpressions.Match ep in System.Text.RegularExpressions.Regex.Matches(m.Groups[2].Value, @"\d+"))
+					have.Add("S" + season.ToString("00") + "E" + int.Parse(ep.Value).ToString("00"));
+			}
+			lock (Lock)
+			{
+				List<string> gone = List.Where(kv => kv.Value.Hash.Equals(hash, StringComparison.OrdinalIgnoreCase))
+					.Select(kv => kv.Key).Where(k => !have.Contains(k.Substring(k.IndexOf('|') + 1))).ToList();
+				if (gone.Count == 0) return;
+				foreach (string k in gone) List.Remove(k);
+				Save();
+				Log.Instance().Print("Auto grabber: the download had only " + string.Join(", ", have.OrderBy(x => x)) + " - " +
+					string.Join(", ", gone.Select(k => k.Substring(k.IndexOf('|') + 1)).OrderBy(x => x)) + " will be looked for again");
+			}
+		}
+
 		public static void Add(SeriesItem s, string episode, string hash, string title, string link)
 		{
 			lock (Lock)

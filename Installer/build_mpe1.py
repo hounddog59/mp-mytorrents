@@ -14,7 +14,7 @@ import os, sys, uuid, zipfile, datetime
 from xml.sax.saxutils import escape
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-VERSION = (1, 3, 58, 0)
+VERSION = (1, 3, 66, 0)
 EXT_ID = "4e2af33d-c719-4478-95f9-231f7ddd3e33"   # original MyTorrents extension id
 BIN = os.path.join(ROOT, "bin", "Release")
 OUT = os.path.join(ROOT, "Installer", "MyTorrents.%d.%d.%d.mpe1" % VERSION[:3])
@@ -177,6 +177,49 @@ public class Script
   }
 }
 """
+# 2026 (1.3.60): the desktop icon. MPEI's own "create shortcut" deleted the icon and made a new one at every update,
+# so Windows put it in the next free spot. Now an icon that's already there is left alone (it keeps its place);
+# it's only made when it's missing. "Remove MyTorrents" (MyTorrents Configuration) takes it away.
+iconscript = r"""//css_reference "MpeCore.dll";
+using MpeCore.Classes;
+using MpeCore;
+public class Script
+{
+  public static void Main(PackageClass packageClass, ActionItem actionItem)
+  {
+    try
+    {
+      string mine = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.DesktopDirectory), "MyTorrents Configuration.lnk");
+      string all = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.CommonDesktopDirectory), "MyTorrents Configuration.lnk");
+      if (System.IO.File.Exists(mine) || System.IO.File.Exists(all)) return;
+      string exe = System.IO.Path.Combine(BaseFolder("MyTorrents Configuration.exe"), "MyTorrents Configuration.exe");
+      System.Type t = System.Type.GetTypeFromProgID("WScript.Shell");
+      object shell = System.Activator.CreateInstance(t);
+      object sc = t.InvokeMember("CreateShortcut", System.Reflection.BindingFlags.InvokeMethod, null, shell, new object[] { mine });
+      System.Type st = sc.GetType();
+      st.InvokeMember("TargetPath", System.Reflection.BindingFlags.SetProperty, null, sc, new object[] { exe });
+      st.InvokeMember("WorkingDirectory", System.Reflection.BindingFlags.SetProperty, null, sc, new object[] { System.IO.Path.GetDirectoryName(exe) });
+      st.InvokeMember("Description", System.Reflection.BindingFlags.SetProperty, null, sc, new object[] { "MyTorrents settings for MediaPortal" });
+      st.InvokeMember("Save", System.Reflection.BindingFlags.InvokeMethod, null, sc, null);
+    }
+    catch { }
+  }
+
+  // the MediaPortal folder: the installer (MpeInstaller.exe) runs from it - 1.3.61 / 4.8.2.2 (MediaPortal's own Config
+  // class isn't always available to installer scripts, so the icon wasn't made)
+  static string BaseFolder(string exe)
+  {
+    string[] tries = {
+      System.AppDomain.CurrentDomain.BaseDirectory,
+      System.IO.Path.GetDirectoryName(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName),
+      System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFilesX86), @"Team MediaPortal\MediaPortal"),
+      System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles), @"Team MediaPortal\MediaPortal") };
+    foreach (string d in tries)
+      if (!string.IsNullOrEmpty(d) && System.IO.File.Exists(System.IO.Path.Combine(d, exe))) return d;
+    return tries[0];
+  }
+}
+"""
 unscript = """//css_reference "MpeCore.dll";
 using MpeCore.Classes;
 using MpeCore;
@@ -257,11 +300,9 @@ x.append(param("Left part image", LEFT_IMG, "File"))
 x.append(param("Show radio buttons", "", "Bool", "Use radiobutton in place of combobox"))
 x.append(param("Header image", "", "File", "Image in upper right part"))
 x.append('          </Items>\n        </Params>\n        <Actions>\n          <Items>\n')
-x.append('            <ActionItem Name="DesktopIcon" ActionType="CreateShortCut" ConditionGroup="DesktopIcon">\n              <Params>\n                <Items>\n')
-x.append(param("ShortCut location", "%DesktopDirectory%\\MyTorrents Configuration.lnk", "Template", "Location of shortcut", indent=18))
-x.append(param("ShortCut target", "%Base%\\" + CONFIG_EXE, "Template", "Target of short cut", indent=18))
-x.append(param("Description", "MyTorrents settings for MediaPortal", "String", "Description tooltip text ", indent=18))
-x.append(param("Icon of the shortcut", "", "Template", "Icon of the shortcut, if is empty the icon of the target will be used", indent=18))
+x.append('            <ActionItem Name="DesktopIcon" ActionType="Script" ConditionGroup="DesktopIcon">\n              <Params>\n                <Items>\n')
+x.append(param("Script", iconscript, "Script", indent=18))
+x.append(param("Uninstall Script", nounscript, "Script", indent=18))
 x.append('                </Items>\n              </Params>\n              <ExecuteLocation>AfterPanelHide</ExecuteLocation>\n            </ActionItem>\n')
 x.append('            <ActionItem Name="OpenConfig" ActionType="RunApplication" ConditionGroup="">\n              <Params>\n                <Items>\n')
 x.append(param("Path to application", "%Base%\\" + CONFIG_EXE, "Template", "Path to the application", indent=18))
@@ -317,9 +358,17 @@ x.append('''  <Dependencies>
   </PluginDependencies>
 ''')
 desc = ("2026 update for MediaPortal 1.38 x64:\n"
+        "- New in 1.3.66: duplicates check never offers episodes with different air dates, season folders or titles as copies; Configuration opens on your last tab; a short season pack no longer blocks the missing episodes\n"
+        "- New in 1.3.65: Poor copies and Stereo-only movies are one list - Movies to improve - with the buttons in each row and a Year column; each movie looks for the best it can (a poor stereo copy gets a better copy, 5.1 if there is one); hidden ones have their own list to put back\n"
+        "- New in 1.3.64: web page - pressing a button further down a list (Find 5.1, Not this one, Add...) brings you back to the same spot, not the top\n"
+        "- New in 1.3.63: age tags (18+, R18) left out of movie names; Use it now works again when the earlier copy has gone; show-folder and movie styles without the rating (When finished)\n"
+        "- New in 1.3.62: Drop folder: when you already have everything in something you dropped in, the Check-up says so and offers Delete it - you have it all; packs already looked at aren't gone through again at every start\n"
+        "- New in 1.3.61: Duplicates never treats different episodes (S01E04 / S02E01, part (1) / (3)) as copies - a wrong match in MP-TVSeries is shown as one; the desktop icon step finds the MediaPortal folder more safely\n"
+        "- New in 1.3.60: Duplicates one at a time - which copy to keep, with the reason in plain words and big buttons, plus Do the easy ones for me; Check-up: pick several lines at once; every list sorts by clicking a heading (Wanted movies gets Year and Added); the desktop icon stays where you put it; movies everywhere (not films)\n"
+        "- New in 1.3.59: Check-up -> Find duplicates: the same episode or movie twice, with the better copy to keep suggested; the others are set aside (nothing deleted until you say); Check-up buttons under the explanation; movies MCM renamed with a year either side are no longer flagged\n"
         "- New in 1.3.58: menus never loop when MediaPortal closes; setup recommends qBittorrent, with help for BiglyBT, uTorrent, Deluge and Transmission; ticked search sites at the top; Browse buttons for the Movies and Collections folders\n"
-        "- New in 1.3.57: the Auto grabber only takes copies whose name starts with the show's name (no more other shows with that word in the title); the daily log files really start each day; Check-up recognises films the renamer renamed; the background helper starts again by itself after an update\n"
-        "- New in 1.3.56: the drop folder never replaces or doubles up what you have (it stays there, the Check-up says why); copies dubbed into another language are skipped; qBittorrent is started if it isn't running; Check-up no longer flags films you moved or renamed; no more duplicate-column errors; quieter log\n"
+        "- New in 1.3.57: the Auto grabber only takes copies whose name starts with the show's name (no more other shows with that word in the title); the daily log files really start each day; Check-up recognises movies the renamer renamed; the background helper starts again by itself after an update\n"
+        "- New in 1.3.56: the drop folder never replaces or doubles up what you have (it stays there, the Check-up says why); copies dubbed into another language are skipped; qBittorrent is started if it isn't running; Check-up no longer flags movies you moved or renamed; no more duplicate-column errors; quieter log\n"
         "- New in 1.3.55: MyTorrents.log starts a new file each day and keeps a week (it used to grow for ever)\n"
         "- New in 1.3.54: a first install sets qBittorrent to start with Windows, minimised to the tray\n"
         "- New in 1.3.53: downloads stuck at 99%+ with no seeds are checked and copied to the library anyway (When finished > Nearly finished, or right-click > Use it now); nearly finished downloads (90%+) are never thrown away as stuck, and the stuck time counts from when data last came in; a first install has good search sites ticked already\n"
@@ -329,13 +378,13 @@ desc = ("2026 update for MediaPortal 1.38 x64:\n"
         "- New in 1.3.49: Check-up (once a day: everything filed is in place, in the library, not twice, not a poor copy; NAS space, search sites - with Fix it buttons; Configuration tab, MediaPortal menu, web page); Poor copies - look for a better one (swapped in once it's safely there); movie name and folder styles like the TV ones (incl. like Media Center Master) with Rename my movies to match (collections too); new show folder style; Smallest movie knows x265 copies are smaller\n"
         "- New in 1.3.48: Smallest movie setting (Automatic: 720p 500 MB, 1080p 1.2 GB, 4K 3 GB) so tiny poor copies are skipped; Tick all / Untick all in Stereo-only movies, Collections you could make and New movies waiting; Movies tab: Favourites box shorter with its note beside it\n"
         "- New in 1.3.47: Open the web page works straight away (starts the background helper itself); fixed the look-up of shows already in MP-TVSeries (new episodes go into the show's own folder again, already-have checks work); one quiet MP-TVSeries scan at night (2-5 am, never while something plays) so its start-up and every-few-minutes scans can be turned off\n"
-        "- New in 1.3.46: Collections you could make (films that belong together, moved into your Collections folder after your OK, plus what's missing from them); stereo-only movies - look for a 5.1 copy (the stereo one is deleted once the new one is in, or kept, your choice); TV shows tab tidied - everyday settings on the tab, the rest under More settings; Uninstall MyTorrents (was Remove); boxes grow with the window; How MyTorrents works (automatic / manual) is one line on My shows\n"
+        "- New in 1.3.46: Collections you could make (movies that belong together, moved into your Collections folder after your OK, plus what's missing from them); stereo-only movies - look for a 5.1 copy (the stereo one is deleted once the new one is in, or kept, your choice); TV shows tab tidied - everyday settings on the tab, the rest under More settings; Uninstall MyTorrents (was Remove); boxes grow with the window; How MyTorrents works (automatic / manual) is one line on My shows\n"
         "- New in 1.3.45: keeps working when MediaPortal is closed (background helper, Background tab); web page for the laptop / desktop / phone (shows, wanted movies, not found, downloads, search, search sites, settings); sound preference (surround / stereo) for TV and movies; movie favourites; tabs renamed and reordered (TV shows, Movies, My shows...), opens on the next set-up step; new movies can be filed for you after your OK; removing a wanted movie also takes it off your Trakt list\n"
         "- New in 1.3.44: no more Media Center Master - new movies get a .nfo with their IMDb id and can be filed for you into Movies or Collections\\[collection] (TMDb through MP-TVSeries); new episodes are handed to MP-TVSeries to import straight away; Save what's not found yet as a text file\n"
         "- New in 1.3.43: Can't find list (episodes and movies looked for 14 days without a copy that fits, with why); OK on a show in the Auto grabber opens its menu; no more garbled pop-ups from background work; dead links try the next copy; 2 shows search at once (setting), shows you ask for never wait; movies on the NAS read in the background (Movies New often, the rest at start or when you ask - Read my movies again); bigger, resizable Configuration window; Movies tab (movie settings, Trakt list and the Wanted movies list)\n"
-        "- New in 1.3.42: your own Trakt list (e.g. MCM) - movies go into Wanted movies and come off the list once safely in your movies folder, shows go into the Auto grabber; Torrent Search button on the Trakt plugin screens; 1080p when there is no good 720p copy (optional); fewer seeders over time when nothing turns up; stuck downloads replaced by another copy; Downloads split into Downloading and Seeding; Search again / try a different copy; Remove MyTorrents (and the programs its setup installed); already-have checks also look in the movies folder; whole seasons only for finished seasons with enough missing; Automatic or Manual at the top of the Auto grabber tab; films are now called movies\n"
+        "- New in 1.3.42: your own Trakt list (e.g. MCM) - movies go into Wanted movies and come off the list once safely in your movies folder, shows go into the Auto grabber; Torrent Search button on the Trakt plugin screens; 1080p when there is no good 720p copy (optional); fewer seeders over time when nothing turns up; stuck downloads replaced by another copy; Downloads split into Downloading and Seeding; Search again / try a different copy; Remove MyTorrents (and the programs its setup installed); already-have checks also look in the movies folder; whole seasons only for finished seasons with enough missing; Automatic or Manual at the top of the Auto grabber tab; movies are now called movies\n"
         "- New in 1.3.41: Wanted movies (add movies you want - downloaded when a good copy turns up); whole seasons first, then single episodes (with a season size limit and favourite season groups); what's missing for a show and a missing-episodes report for your whole library, with Grab the missing ones; Trakt lists - recommended, your watchlist, similar, trending, popular and most anticipated movies and shows; episodes you already have are not copied again from season packs\n"
-        "- New in 1.3.40: Torrent Search from the left menu of TV Series and Moving Pictures; film searches use their own quality (1080p) and size (2.5 GB); Add a new series (only new episodes / whole series / one season, with its folder and TVDB id file); Automatic or Manual mode (Manual for new installs)\n"
+        "- New in 1.3.40: Torrent Search from the left menu of TV Series and Moving Pictures; movie searches use their own quality (1080p) and size (2.5 GB); Add a new series (only new episodes / whole series / one season, with its folder and TVDB id file); Automatic or Manual mode (Manual for new installs)\n"
         "- New in 1.3.39: naming choices for finished episodes and new season folders (When finished tab, with a live example); the next episode's air date is right after a download; Airs sorts by calendar\n"
         "- New in 1.3.38: new episodes go into the show and season folders you already have; Check now, Search again and Remove (with Removed shows) in MyTorrents Configuration; click column headings to sort; clean-up after seeding; views in MediaPortal show again; Configuration tab renamed Torrent client\n"
         "- Works on 64-bit MediaPortal (.NET 4.7.2, AnyCPU)\n"

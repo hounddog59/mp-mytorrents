@@ -6,7 +6,7 @@ using MediaPortal.Common.Utils;
 
 [assembly: CompatibleVersion("1.6.100.0")]
 [assembly: AssemblyTitle("MyTorrents")]
-[assembly: AssemblyFileVersion("1.3.58.0")]
+[assembly: AssemblyFileVersion("1.3.66.0")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]

@@ -113,6 +113,11 @@ namespace Sohvaperuna.MyTorrents
 			tabControl1.TabPages.Clear();
 			tabControl1.TabPages.AddRange(new TabPage[] { _moviesPage, _grabberPage, shows, downloads, _finishedPage, checkUp, tabPage2, tabPage1, _sitesPage, _backgroundPage, about }); // 1.3.52: Search sites after the torrent program
 			tabControl1.SelectedTab = FirstStep();
+			// 2026 (1.3.66): remember the last tab - it opens there next time (unless a setup step still needs doing)
+			tabControl1.SelectedIndexChanged += (s, e) =>
+			{
+				if (tabControl1.SelectedTab != null) Configuration.SetExtra("Config.LastTab", tabControl1.SelectedTab.Text);
+			};
 			// 2026 (1.3.45): the boxes on these tabs grow with the window (and the long text / folder boxes in them)
 			foreach (TabPage page in new TabPage[] { _grabberPage, _moviesPage, _finishedPage, _backgroundPage })
 			{
@@ -244,6 +249,9 @@ namespace Sohvaperuna.MyTorrents
 			{
 			}
 			if (string.IsNullOrEmpty(Configuration.GetExtra("Finished.TVFolder", "")) && string.IsNullOrEmpty(LibraryFolders.DefaultTV())) return _finishedPage;
+			string last = Configuration.GetExtra("Config.LastTab", ""); // 2026 (1.3.66)
+			foreach (TabPage t in tabControl1.TabPages)
+				if (t.Text == last) return t;
 			return _grabberPage;
 		}
 

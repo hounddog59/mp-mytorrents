@@ -30,7 +30,7 @@ namespace Sohvaperuna.MyTorrents
 			public bool FolderExists;
 			public List<Film> Films = new List<Film>();
 			public string Text => (FolderExists ? "Belongs in your " + Path.GetFileName(Folder) + " collection" : "Make a " + Name + " collection") +
-				" - " + Films.Count + (Films.Count == 1 ? " film" : " films") + ": " + string.Join(", ", Films.Select(f => f.Display));
+				" - " + Films.Count + (Films.Count == 1 ? " movie" : " movies") + ": " + string.Join(", ", Films.Select(f => f.Display));
 		}
 
 		private static string IgnoreFile => MediaPortal.Configuration.Config.GetFile(MediaPortal.Configuration.Config.Dir.Config, "MyTorrents.collections-ignore.txt");
@@ -151,7 +151,7 @@ namespace Sohvaperuna.MyTorrents
 				}
 			}
 			LibraryFolders.RereadLibrary();
-			Log.Instance().Print("Collections: " + s.Name + " - moved " + (s.Films.Count - problems.Count) + " of " + s.Films.Count + " films into " + s.Folder);
+			Log.Instance().Print("Collections: " + s.Name + " - moved " + (s.Films.Count - problems.Count) + " of " + s.Films.Count + " movies into " + s.Folder);
 			return string.Join("\r\n", problems);
 		}
 

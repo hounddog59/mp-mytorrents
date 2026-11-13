@@ -7,4 +7,4 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyCopyright("Copyright © 2026")]
 [assembly: ComVisible(false)]
 [assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.3.58.0")]
+[assembly: AssemblyFileVersion("1.3.66.0")]

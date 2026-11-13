@@ -1,6 +1,6 @@
 # MyTorrents for MediaPortal 1
 
-MyTorrents finds and downloads TV episodes and films for your MediaPortal library, and files them where
+MyTorrents finds and downloads TV episodes and movies for your MediaPortal library, and files them where
 MediaPortal expects them. It is a 2026 revival of the old MP-MyTorrents plugin (originally by Sohvaperuna /
 edalex86, last release 0.80 in 2018), updated for **MediaPortal 1.39 x64**.
 
@@ -17,13 +17,13 @@ it's needed.
   samples and foreign-language dubs are filtered out.
 - **Auto grabber for TV.** It follows your shows in MP-TVSeries and gets new episodes as they air. The
   episode must really belong to that show, and it picks the quality, size and sound you want.
-- **Wanted films.** Films from your Trakt lists and Moving Pictures are found and fetched.
+- **Wanted movies.** Movies from your Trakt lists and Moving Pictures are found and fetched.
 - **When a download finishes.** It renames the files, copies them into your TV or Movies folders, and tells
   MP-TVSeries / Moving Pictures to add them. It cleans up after seeding, but never deletes anything inside
   your library.
 - **Stuck downloads.** Downloads with no seeds are replaced by another copy. Ones that are nearly finished
   (90% or more) are protected, and can be used straight away if the file plays.
-- **Drop folder.** Put a film or episode in it and MyTorrents files it for you. It won't replace something
+- **Drop folder.** Put a movie or episode in it and MyTorrents files it for you. It won't replace something
   you already have.
 - **Works with MediaPortal closed.** A small background helper keeps going, and there's a web page for
   settings and progress at `http://<your PC>:9118`.
@@ -50,7 +50,7 @@ restarts the background helper by itself.
 ## Requirements
 
 - MediaPortal 1.39 x64 (1.34 or newer should work)
-- MP-TVSeries for TV shows (the community 4.8 version is recommended) and Moving Pictures for films
+- MP-TVSeries for TV shows (the community 4.8 version is recommended) and Moving Pictures for movies
 - A torrent program. Setup installs qBittorrent if you don't have one.
 
 ## Torrent programs

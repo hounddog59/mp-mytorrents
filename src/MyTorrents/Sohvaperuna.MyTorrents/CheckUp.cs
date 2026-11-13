@@ -253,7 +253,7 @@ namespace Sohvaperuna.MyTorrents
 						size = SafeSize(p[1]);
 					}
 					if (!IsLeftover(p[1], size)) continue;
-					Add(list, ignored, "fix", p[0], Path.GetFileName(p[1]) + " is a sample / advert video (" + Math.Max(1, size / 1024 / 1024) + " MB) - not part of the " + (p[0] == "TV" ? "episode" : "film") + ".", p[1], "leftover", "left|" + p[1]);
+					Add(list, ignored, "fix", p[0], Path.GetFileName(p[1]) + " is a sample / advert video (" + Math.Max(1, size / 1024 / 1024) + " MB) - not part of the " + (p[0] == "TV" ? "episode" : "movie") + ".", p[1], "leftover", "left|" + p[1]);
 				}
 			}
 			catch
@@ -262,7 +262,8 @@ namespace Sohvaperuna.MyTorrents
 
 			// ---- the drop folder: things that couldn't be filed
 			foreach (var kv in DropFolder.Left())
-				Add(list, ignored, "fix", "Drop folder", Path.GetFileName(kv.Key) + " is still in the drop folder - " + kv.Value + ".", kv.Key, "open", "drop|" + kv.Key);
+				Add(list, ignored, "fix", "Drop folder", Path.GetFileName(kv.Key) + " is still in the drop folder - " + kv.Value + ".", kv.Key,
+					kv.Value.StartsWith(DropFolder.HaveItAll) ? "dropdelete" : "open", "drop|" + kv.Key); // 1.3.62
 
 			// ---- movie names (only when you've chosen a naming style)
 			try
@@ -370,11 +371,19 @@ namespace Sohvaperuna.MyTorrents
 		{
 			string y;
 			HashSet<string> w;
-			if (!TitleWords(file, out y, out w) || !index.TryGetValue(y, out List<HashSet<string>> same)) return false;
-			foreach (HashSet<string> other in same)
+			if (!TitleWords(file, out y, out w)) return false;
+			// 1.3.59: a year either side too - Media Center Master often renames with the local release year
+			// ("City of God (2002)" -> "City of God (2003)")
+			int year;
+			IEnumerable<string> years = int.TryParse(y, out year) ? new[] { y, (year - 1).ToString(), (year + 1).ToString() } : new[] { y };
+			foreach (string yy in years)
 			{
-				int small = Math.Min(w.Count, other.Count), both = w.Count(other.Contains);
-				if (small == 1 ? (both == 1 && w.Count == other.Count) : both >= Math.Ceiling(small * 0.75)) return true;
+				if (!index.TryGetValue(yy, out List<HashSet<string>> same)) continue;
+				foreach (HashSet<string> other in same)
+				{
+					int small = Math.Min(w.Count, other.Count), both = w.Count(other.Contains);
+					if (small == 1 ? (both == 1 && w.Count == other.Count) : both >= Math.Ceiling(small * 0.75)) return true;
+				}
 			}
 			return false;
 		}

@@ -26,13 +26,14 @@ namespace Sohvaperuna.MyTorrents
 		private readonly GroupBox _wanted = new GroupBox { Text = "Wanted movies" };
 		// 2026 (1.3.44): where new movies go (no more Media Center Master)
 		private readonly RadioButton _iFile = new RadioButton { AutoSize = true, Text = "Leave them in my new-movies folder - I file them myself" };
-		private readonly RadioButton _fileForMe = new RadioButton { AutoSize = true, Text = "File them for me - into Movies, or Collections\\[collection]\\ when the film is part of one" };
+		private readonly RadioButton _fileForMe = new RadioButton { AutoSize = true, Text = "File them for me - into Movies, or Collections\\[collection]\\ when the movie is part of one" };
 		private readonly RadioButton _askFirst = new RadioButton { AutoSize = true, Text = "File them for me, but show me first (they wait in the new-movies folder for your OK)" }; // 1.3.45
 		private readonly Button _waiting = new Button { Text = "Waiting for your OK...", AutoSize = true };
 		private readonly ComboBox _moviesFolder = new ComboBox { DropDownStyle = ComboBoxStyle.DropDown, Width = 360 };
 		private readonly ComboBox _collectionsFolder = new ComboBox { DropDownStyle = ComboBoxStyle.DropDown, Width = 360 };
-		private readonly CheckBox _nfo = new CheckBox { AutoSize = true, Text = "Write a small .nfo with the film's IMDb id next to it (Moving Pictures then picks the exact film)" };
+		private readonly CheckBox _nfo = new CheckBox { AutoSize = true, Text = "Write a small .nfo with the movie's IMDb id next to it (Moving Pictures then picks the exact movie)" };
 		private readonly ListView _list = new ListView { View = View.Details, FullRowSelect = true, HideSelection = false, MultiSelect = true };
+		private readonly ListSorter _wantedSorter; // 1.3.60
 		private readonly TextBox _title = new TextBox { Width = 230 };
 		private readonly TextBox _year = new TextBox { Width = 50, MaxLength = 4 };
 		private readonly Button _add = new Button { Text = "Add", AutoSize = true };
@@ -143,17 +144,14 @@ namespace Sohvaperuna.MyTorrents
 			Button coll = new Button { Text = "Collections you could make...", AutoSize = true, Location = new Point(12, 18) };
 			coll.Click += (s, e) => { Cursor.Current = Cursors.WaitCursor; LibraryDialogs.CollectionsWindow(this); };
 			lib.Controls.Add(coll);
-			Button stereo = new Button { Text = "Stereo-only movies (find 5.1)...", AutoSize = true };
+			Button stereo = new Button { Text = "Movies to improve (better copy / 5.1)...", AutoSize = true }; // 2026 (1.3.65): poor copies + stereo-only in one
 			lib.Controls.Add(stereo);
 			stereo.Location = new Point(coll.Left + coll.PreferredSize.Width + 10, 18);
-			stereo.Click += (s, e) => { Cursor.Current = Cursors.WaitCursor; LibraryDialogs.StereoWindow(this); };
+			stereo.Click += (s, e) => { Cursor.Current = Cursors.WaitCursor; LibraryDialogs.ImproveWindow(this); };
 			Button names = new Button { Text = "Rename to match my naming...", AutoSize = true }; // 2026 (1.3.49)
 			lib.Controls.Add(names);
 			names.Location = new Point(stereo.Left + stereo.PreferredSize.Width + 10, 18);
 			names.Click += (s, e) => LibraryDialogs.RenameWindow(this);
-			Button poor = new Button { Text = "Poor copies (find a better one)...", AutoSize = true, Location = new Point(12, 48) }; // 2026 (1.3.49)
-			poor.Click += (s, e) => { Cursor.Current = Cursors.WaitCursor; LibraryDialogs.PoorWindow(this); };
-			lib.Controls.Add(poor);
 
 			// the Wanted movies list
 			_wanted.Location = new Point(8, 494);
@@ -161,6 +159,13 @@ namespace Sohvaperuna.MyTorrents
 			Controls.Add(_wanted);
 			_list.Columns.Add("Movie", 260);
 			_list.Columns.Add("State", 260);
+			// 1.3.60: click a heading to sort (and Year / Added to sort by)
+			_list.Columns.Add("Year", 50);
+			_list.Columns.Add("Added", 80);
+			_wantedSorter = new ListSorter(_list, "Wanted")
+				.Key(0, i => MediaNames.Key((i.Tag as WantedFilms.Film)?.Title ?? ""))
+				.Key(2, i => { int y; int.TryParse((i.Tag as WantedFilms.Film)?.Year, out y); return y; })
+				.Key(3, i => (i.Tag as WantedFilms.Film)?.Added ?? DateTime.MinValue);
 			// 2026 (1.3.52): right-click - look it up on TMDb
 			ContextMenuStrip wmenu = new ContextMenuStrip();
 			wmenu.Items.Add("Look it up on TMDb", null, (s, e) =>
@@ -261,12 +266,13 @@ namespace Sohvaperuna.MyTorrents
 			foreach (WantedFilms.Film x in WantedFilms.Read())
 			{
 				string state = WantedFilms.StateText(x) + (cantFind.Contains(x.Title + "|" + x.Year) ? "  - on the Can't find list" : "");
-				ListViewItem i = new ListViewItem(new[] { x.Display, state }) { Tag = x, Name = x.Title + "|" + x.Year };
+				ListViewItem i = new ListViewItem(new[] { x.Display, state, x.Year, x.Added.ToString("d MMM yyyy") }) { Tag = x, Name = x.Title + "|" + x.Year };
 				if (cantFind.Contains(x.Title + "|" + x.Year)) i.ForeColor = Color.DarkOrange;
 				i.Selected = keep.Contains(i.Name);
 				_list.Items.Add(i);
 			}
 			_list.EndUpdate();
+			_wantedSorter.Apply();
 			_wanted.Text = "Wanted movies (" + _list.Items.Count + ")";
 		}
 
@@ -325,6 +331,7 @@ namespace Sohvaperuna.MyTorrents
 				lv.Columns.Add("Movie", 260);
 				lv.Columns.Add("Goes to", 420);
 				foreach (MovieFiling.Pending p in list) lv.Items.Add(new ListViewItem(new[] { p.Title, p.To }) { Tag = p, Checked = true });
+				new ListSorter(lv, "FileMovies").Apply(); // 1.3.60
 				LibraryDialogs.AddOpen(lv, i => (i.Tag as MovieFiling.Pending)?.From); // 1.3.50
 				LookUp.AddTo(lv, i => LookUp.What.FromName((i.Tag as MovieFiling.Pending)?.Title ?? "")); // 1.3.52
 				Button ok = new Button { Text = "OK - file them", Location = new Point(10, 322), AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };

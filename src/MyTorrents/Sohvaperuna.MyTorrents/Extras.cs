@@ -336,8 +336,7 @@ namespace Sohvaperuna.MyTorrents
 				int waiting = MovieFiling.Waiting().Count;
 				menu.Add("New movies waiting for your OK (" + waiting + ")..."); // 2026 (1.3.45)
 				menu.Add("Collections you could make..."); // 2026 (1.3.46)
-				menu.Add("Stereo-only movies - find 5.1..."); // 2026 (1.3.46)
-				menu.Add("Poor copies - find a better one..."); // 2026 (1.3.49)
+				menu.Add("Movies to improve - better copy / 5.1..."); // 2026 (1.3.46 / 1.3.49; one list since 1.3.65)
 				foreach (WantedFilms.Film f in films) menu.Add(f.Display + "  -  " + WantedFilms.StateText(f));
 				menu.DoModal(GUIWindowManager.ActiveWindow);
 				Menus.Check(menu);
@@ -366,15 +365,10 @@ namespace Sohvaperuna.MyTorrents
 				}
 				if (pick == 5)
 				{
-					StereoMenu();
+					ImproveMenu();
 					continue;
 				}
-				if (pick == 6)
-				{
-					PoorMenu();
-					continue;
-				}
-				WantedFilms.Film film = films[pick - 7];
+				WantedFilms.Film film = films[pick - 6];
 				menu.Reset();
 				menu.SetHeading(film.Display);
 				menu.Add("Look for it now");
@@ -415,7 +409,7 @@ namespace Sohvaperuna.MyTorrents
 					Menus.Check(menu);
 					return;
 				}
-				foreach (Collections.Suggestion x in list) menu.Add(x.Name + "  -  " + (x.FolderExists ? "add " + x.Films.Count + " to yours" : x.Films.Count + " films"));
+				foreach (Collections.Suggestion x in list) menu.Add(x.Name + "  -  " + (x.FolderExists ? "add " + x.Films.Count + " to yours" : x.Films.Count + " movies"));
 				menu.DoModal(GUIWindowManager.ActiveWindow);
 				Menus.Check(menu);
 				if (menu.SelectedId < 1) return;
@@ -431,7 +425,7 @@ namespace Sohvaperuna.MyTorrents
 				int c = menu.SelectedId;
 				if (c == 1)
 				{
-					Notify("Collections", "Moving " + pick.Films.Count + " films into " + pick.Name + " in the background.");
+					Notify("Collections", "Moving " + pick.Films.Count + " movies into " + pick.Name + " in the background.");
 					System.Threading.ThreadPool.QueueUserWorkItem(_ =>
 					{
 						try
@@ -456,16 +450,18 @@ namespace Sohvaperuna.MyTorrents
 			}
 		}
 
-		/// 2026 (1.3.46): movies with stereo-only sound - look for a 5.1 copy, or say no.
-		public static void StereoMenu()
+		/// 2026 (1.3.65): Movies to improve - poor copies and stereo-only movies in one list, by title (or by year).
+		public static void ImproveMenu()
 		{
+			bool byYear = false;
 			while (true)
 			{
-				List<SoundUpgrades.Movie> list = SoundUpgrades.StereoMovies();
+				List<Improve.Item> list = Improve.List();
+				if (byYear) list = list.OrderBy(m => m.Year).ThenBy(m => m.Title).ToList();
 				GUIDialogMenu menu = (GUIDialogMenu)GUIWindowManager.GetWindow(2012);
 				if (menu == null) return;
 				menu.Reset();
-				menu.SetHeading(list.Count == 0 ? "No stereo-only movies" : list.Count + " stereo-only movies");
+				menu.SetHeading(list.Count == 0 ? "No movies to improve" : list.Count + " movies to improve");
 				if (list.Count == 0)
 				{
 					menu.Add("OK");
@@ -473,23 +469,67 @@ namespace Sohvaperuna.MyTorrents
 					Menus.Check(menu);
 					return;
 				}
-				foreach (SoundUpgrades.Movie m in list) menu.Add(m.Display + "  -  " + m.Channels + (m.Resolution.Length > 0 ? ", " + m.Resolution : ""));
+				menu.Add(byYear ? "Sort by title" : "Sort by year");
+				menu.Add("Hidden - you said Not this one (" + Improve.Hidden().Count + ")..."); // 2026 (1.3.65)
+				foreach (Improve.Item m in list) menu.Add(m.Display + "  -  " + m.Problem);
 				menu.DoModal(GUIWindowManager.ActiveWindow);
 				Menus.Check(menu);
 				if (menu.SelectedId < 1) return;
-				SoundUpgrades.Movie pick = list[menu.SelectedId - 1];
+				if (menu.SelectedId == 1)
+				{
+					byYear = !byYear;
+					continue;
+				}
+				if (menu.SelectedId == 2)
+				{
+					HiddenMenu();
+					continue;
+				}
+				Improve.Item pick = list[menu.SelectedId - 3];
 				menu.Reset();
 				menu.SetHeading(pick.Display);
-				menu.Add("Look for a 5.1 copy" + (SoundUpgrades.DeleteOld ? " (the stereo one goes once it's in)" : " (keep both)"));
+				menu.Add("Look for " + pick.LooksFor + (SoundUpgrades.DeleteOld ? " (the old one goes once it's in)" : " (keep both)"));
 				menu.Add("Not this one");
 				menu.DoModal(GUIWindowManager.ActiveWindow);
 				Menus.Check(menu);
 				if (menu.SelectedId == 1)
 				{
-					SoundUpgrades.Look(pick);
-					Notify("5.1 upgrades", pick.Display + " is on Wanted movies as a 5.1 upgrade.");
+					Improve.Look(pick);
+					Notify("Movies to improve", Improve.Added(pick) + ".");
 				}
-				else if (menu.SelectedId == 2) SoundUpgrades.Ignore(pick);
+				else if (menu.SelectedId == 2) Improve.Ignore(pick);
+			}
+		}
+
+		/// 2026 (1.3.65): movies hidden from Movies to improve - pick one to put it back.
+		private static void HiddenMenu()
+		{
+			while (true)
+			{
+				List<Improve.Item> list = Improve.Hidden();
+				GUIDialogMenu menu = (GUIDialogMenu)GUIWindowManager.GetWindow(2012);
+				if (menu == null) return;
+				menu.Reset();
+				menu.SetHeading(list.Count == 0 ? "Nothing hidden" : list.Count + " hidden - pick one to put back");
+				if (list.Count == 0)
+				{
+					menu.Add("OK");
+					menu.DoModal(GUIWindowManager.ActiveWindow);
+					Menus.Check(menu);
+					return;
+				}
+				menu.Add("Put them all back");
+				foreach (Improve.Item m in list) menu.Add(m.Display);
+				menu.DoModal(GUIWindowManager.ActiveWindow);
+				Menus.Check(menu);
+				if (menu.SelectedId < 1) return;
+				if (menu.SelectedId == 1)
+				{
+					foreach (Improve.Item m in list) Improve.PutBack(m.File);
+					Notify("Movies to improve", "All put back.");
+					return;
+				}
+				Improve.PutBack(list[menu.SelectedId - 2].File);
 			}
 		}
 
@@ -530,43 +570,6 @@ namespace Sohvaperuna.MyTorrents
 				else if (c.StartsWith("Delete")) { string r = pick.Action == "leftover" ? CheckUp.DeleteLeftover(pick) : CheckUp.DeleteExtra(pick); Notify("Check-up", r.Length == 0 ? "Deleted." : r); }
 				else if (c.StartsWith("Look")) { PoorCopies.Look(pick.Title, pick.Year, pick.File); CheckUp.Done(pick); Notify("Check-up", pick.Title + " is on Wanted movies to replace."); }
 				else if (c.StartsWith("Ignore")) CheckUp.Ignore(pick);
-			}
-		}
-
-		/// 2026 (1.3.49): poor copies - look for a better one, or say no.
-		public static void PoorMenu()
-		{
-			while (true)
-			{
-				List<SoundUpgrades.Movie> list = PoorCopies.List();
-				GUIDialogMenu menu = (GUIDialogMenu)GUIWindowManager.GetWindow(2012);
-				if (menu == null) return;
-				menu.Reset();
-				menu.SetHeading(list.Count == 0 ? "No poor copies" : list.Count + " poor copies");
-				if (list.Count == 0)
-				{
-					menu.Add("OK");
-					menu.DoModal(GUIWindowManager.ActiveWindow);
-					Menus.Check(menu);
-					return;
-				}
-				foreach (SoundUpgrades.Movie m in list) menu.Add(m.Display + "  -  " + m.Channels);
-				menu.DoModal(GUIWindowManager.ActiveWindow);
-				Menus.Check(menu);
-				if (menu.SelectedId < 1) return;
-				SoundUpgrades.Movie pick = list[menu.SelectedId - 1];
-				menu.Reset();
-				menu.SetHeading(pick.Display);
-				menu.Add("Look for a better copy" + (SoundUpgrades.DeleteOld ? " (the old one goes once it's in)" : " (keep both)"));
-				menu.Add("Not this one");
-				menu.DoModal(GUIWindowManager.ActiveWindow);
-				Menus.Check(menu);
-				if (menu.SelectedId == 1)
-				{
-					PoorCopies.Look(pick);
-					Notify("Better copy", pick.Display + " is on Wanted movies to replace.");
-				}
-				else if (menu.SelectedId == 2) PoorCopies.Ignore(pick);
 			}
 		}
 

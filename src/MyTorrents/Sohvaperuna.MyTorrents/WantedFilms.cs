@@ -26,9 +26,11 @@ namespace Sohvaperuna.MyTorrents
 			public string Hash = "", Link = "";
 			public DateTime Started = DateTime.MinValue;
 			public string DeadKey => MediaNames.Key(Title) + Year;
-			public bool Better => Replace.Length > 0 && Why == "better";
+			public bool Better => Replace.Length > 0 && (Why == "better" || Why == "best");
+			/// 2026 (1.3.65): "best" = a poor copy that is also stereo - a better copy, 5.1 when there is one
+			public bool Best => Replace.Length > 0 && Why == "best";
 			public DateTime Added = DateTime.Now, LastLook = DateTime.MinValue;
-			public string Display => Title + (Year.Length > 0 ? " (" + Year + ")" : "") + (Replace.Length > 0 ? (Better ? " - better copy" : " - 5.1 upgrade") : "");
+			public string Display => Title + (Year.Length > 0 ? " (" + Year + ")" : "") + (Replace.Length > 0 ? (Best ? " - better copy (5.1 if there is one)" : Better ? " - better copy" : " - 5.1 upgrade") : "");
 		}
 
 		private static readonly object Lock = new object();
@@ -98,7 +100,8 @@ namespace Sohvaperuna.MyTorrents
 		/// 2026 (1.3.46): a 5.1 copy to replace the stereo one at "replace".
 		public static bool AddUpgrade(string title, string year, string replace) => AddUpgrade(title, year, replace, "");
 
-		/// why: "" = a 5.1 copy, "better" = 2026 (1.3.49) a better copy of a movie you have (too small / poor).
+		/// why: "" = a 5.1 copy, "better" = 2026 (1.3.49) a better copy of a movie you have (too small / poor),
+		/// "best" = 2026 (1.3.65) both: any better copy, a 5.1 one first.
 		public static bool AddUpgrade(string title, string year, string replace, string why)
 		{
 			title = Clean(title);
@@ -108,7 +111,7 @@ namespace Sohvaperuna.MyTorrents
 			if (list.Any(x => x.Replace == replace && x.State != "have")) return false;
 			list.Add(new Film { Title = title, Year = year, Replace = replace, Why = why ?? "" });
 			Write(list);
-			Log.Instance().Print("Wanted movies: looking for a " + (why == "better" ? "better" : "5.1") + " copy of " + title + (year.Length > 0 ? " (" + year + ")" : ""));
+			Log.Instance().Print("Wanted movies: looking for a " + (why == "best" ? "better (5.1 if there is one)" : why == "better" ? "better" : "5.1") + " copy of " + title + (year.Length > 0 ? " (" + year + ")" : ""));
 			return true;
 		}
 
@@ -345,6 +348,7 @@ namespace Sohvaperuna.MyTorrents
 			int minSeeds = Math.Max(1, SeriesItem.MinSeeders);
 			string[] favs = Films.Favourites;
 			string sound = film.Replace.Length > 0 && !film.Better ? "only-surround" : Sound.Movies; // 2026 (1.3.45); 1.3.46: upgrades need 5.1
+			if (film.Best) sound = "prefer-surround"; // 2026 (1.3.65): any better copy counts, a 5.1 one first
 			// 2026 (1.3.49): a better copy must be clearly bigger than the one you have (a quarter more at least)
 			if (film.Better)
 			{
@@ -372,7 +376,8 @@ namespace Sohvaperuna.MyTorrents
 			}).ToList();
 			if (ok.Count == 0) return null;
 			bool x265 = SeriesItem.Codec != null && SeriesItem.Codec.IndexOf("265", StringComparison.OrdinalIgnoreCase) >= 0;
-			return ok.OrderByDescending(m => Films.IsFavourite(m, favs))
+			return ok.OrderByDescending(m => film.Best ? Sound.Rank(m, sound) : 0) // 2026 (1.3.65): best = 5.1 first of all
+				.ThenByDescending(m => Films.IsFavourite(m, favs))
 				.ThenByDescending(m => x265 && Regex.IsMatch(m.Title ?? "", @"x265|hevc|h\.?265", RegexOptions.IgnoreCase))
 				.ThenByDescending(m => Sound.Rank(m, sound))
 				.ThenByDescending(m => m.Seed).First();

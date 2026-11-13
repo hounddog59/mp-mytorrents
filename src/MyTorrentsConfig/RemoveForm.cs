@@ -126,6 +126,15 @@ namespace Sohvaperuna.MyTorrentsConfig
 				List<string> problems = new List<string>();
 				try
 				{
+					// 2026 (1.3.60): the desktop icon (the installer leaves it in place at updates, so it's taken away here)
+					try
+					{
+						string lnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "MyTorrents Configuration.lnk");
+						if (File.Exists(lnk)) File.Delete(lnk);
+					}
+					catch
+					{
+					}
 					// 2026 (1.3.45): the background helper - stop it and don't start it with Windows any more
 					try
 					{

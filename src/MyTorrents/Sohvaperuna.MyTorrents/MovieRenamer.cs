@@ -126,7 +126,7 @@ namespace Sohvaperuna.MyTorrents
 		{
 			try
 			{
-				if (System.Diagnostics.Process.GetProcessesByName("MediaPortal").Length > 0) return "Close MediaPortal first - it has the films open.";
+				if (System.Diagnostics.Process.GetProcessesByName("MediaPortal").Length > 0) return "Close MediaPortal first - it has the movies open.";
 				if (!File.Exists(i.OldFile)) return i.Display + ": the file isn't there any more (" + i.OldFile + ")";
 				string oldDir = Path.GetDirectoryName(i.OldFile);
 				string oldBase = Path.GetFileNameWithoutExtension(i.OldFile);

@@ -42,16 +42,43 @@ namespace Sohvaperuna.MyTorrents
 			}
 		}
 
+		/// 2026 (1.3.65): "Not this one" hides it from Poor copies too when it's on both lists.
 		public static void Ignore(Movie m)
+		{
+			IgnoreOnly(m.File);
+			if (PoorCopies.PoorFiles().ContainsKey(m.File)) PoorCopies.IgnoreOnly(m.File);
+		}
+
+		/// 2026 (1.3.65): the hidden ones, to look over and put back.
+		public static HashSet<string> IgnoredFiles() => Ignored();
+
+		public static void Unignore(string file)
 		{
 			try
 			{
-				System.IO.File.AppendAllText(IgnoreFile, m.File + Environment.NewLine);
+				if (!System.IO.File.Exists(IgnoreFile)) return;
+				System.IO.File.WriteAllLines(IgnoreFile, System.IO.File.ReadAllLines(IgnoreFile).Where(l => l.Length > 0 && !l.Equals(file, StringComparison.OrdinalIgnoreCase)).ToArray());
 			}
 			catch
 			{
 			}
 		}
+
+		public static void IgnoreOnly(string file)
+		{
+			try
+			{
+				System.IO.File.AppendAllText(IgnoreFile, file + Environment.NewLine);
+			}
+			catch
+			{
+			}
+		}
+
+		/// 2026 (1.3.65): every stereo / mono movie file, whatever was said about it.
+		public static HashSet<string> StereoFiles() => new HashSet<string>(LibraryFolders.Read("movingpictures.db3",
+			"select ifnull(f.fullpath,'') from local_media f where f.audiochannels in ('Stereo','Mono','stereo','mono','2.0','1.0') and (f.ignored = 0 or f.ignored is null)")
+			.Where(x => x.Length > 0), StringComparer.OrdinalIgnoreCase);
 
 		/// Your stereo / mono movies that aren't already being upgraded or turned down.
 		public static List<Movie> StereoMovies()
@@ -75,7 +102,8 @@ namespace Sohvaperuna.MyTorrents
 			return list.OrderBy(m => m.Title).ThenBy(m => m.Year).ToList();
 		}
 
-		public static bool Look(Movie m) => WantedFilms.AddUpgrade(m.Title, m.Year > 0 ? m.Year.ToString() : "", m.File);
+		/// 2026 (1.3.65): a poor copy as well = look for the best: a better copy, 5.1 if there is one.
+		public static bool Look(Movie m) => WantedFilms.AddUpgrade(m.Title, m.Year > 0 ? m.Year.ToString() : "", m.File, PoorCopies.PoorFiles().ContainsKey(m.File) ? "best" : "");
 
 		/// Called with the Wanted movies check: upgrades whose 5.1 copy is now safely in place are finished (the stereo
 		/// copy deleted, or kept).

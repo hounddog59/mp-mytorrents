@@ -27,8 +27,14 @@ namespace Sohvaperuna.MyTorrents
 				};
 				ListView lv = new ListView { View = View.Details, FullRowSelect = true, HideSelection = false, MultiSelect = true, Location = new Point(10, 44), Size = new Size(540, 270), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom };
 				LookUp.AddTo(lv, it => { WantedFilms.Film x = it.Tag as WantedFilms.Film; int y; return x == null ? null : LookUp.What.Movie(x.Title, int.TryParse(x.Year, out y) ? y : 0); }); // 1.3.52
-				lv.Columns.Add("Movie", 260);
-				lv.Columns.Add("State", 270);
+				lv.Columns.Add("Movie", 230);
+				lv.Columns.Add("State", 190);
+				lv.Columns.Add("Year", 45);
+				lv.Columns.Add("Added", 75);
+				ListSorter sorter = new ListSorter(lv, "Wanted") // 1.3.60: click a heading to sort
+					.Key(0, i => MediaNames.Key((i.Tag as WantedFilms.Film)?.Title ?? ""))
+					.Key(2, i => { int y; int.TryParse((i.Tag as WantedFilms.Film)?.Year, out y); return y; })
+					.Key(3, i => (i.Tag as WantedFilms.Film)?.Added ?? DateTime.MinValue);
 				Label tl = new Label { Text = "Title", Location = new Point(10, 327), AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
 				TextBox title = new TextBox { Location = new Point(45, 324), Width = 250, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
 				Label yl = new Label { Text = "Year", Location = new Point(305, 327), AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
@@ -57,8 +63,9 @@ namespace Sohvaperuna.MyTorrents
 				{
 					lv.BeginUpdate();
 					lv.Items.Clear();
-					foreach (WantedFilms.Film x in WantedFilms.Read()) lv.Items.Add(new ListViewItem(new[] { x.Display, WantedFilms.StateText(x) }) { Tag = x });
+					foreach (WantedFilms.Film x in WantedFilms.Read()) lv.Items.Add(new ListViewItem(new[] { x.Display, WantedFilms.StateText(x), x.Year, x.Added.ToString("d MMM yyyy") }) { Tag = x });
 					lv.EndUpdate();
+					sorter.Apply();
 				};
 				lv.SelectedIndexChanged += (s, e) => look.Enabled = remove.Enabled = lv.SelectedItems.Count > 0;
 				add.Click += (s, e) =>
